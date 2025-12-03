@@ -36,9 +36,6 @@ const generateStoryScriptFlow = ai.defineFlow(
   async input => {
     const {text} = await ai.generate({
       prompt: `You are a script writer for short cinematic stories. Generate a short story script based on the user's prompt, optimized for cinematic visuals.\n\nPrompt: ${input.prompt}`,
-      output: {
-        schema: GenerateStoryScriptOutputSchema,
-      },
     });
     return { script: text };
   }
