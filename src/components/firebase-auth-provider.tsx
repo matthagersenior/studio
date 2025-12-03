@@ -1,6 +1,6 @@
 "use client";
 
-import { auth } from "@/lib/firebase/config";
+import { auth } from "@/firebase";
 import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
 import { type ReactNode, useEffect, useState } from "react";
 
