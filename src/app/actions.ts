@@ -23,29 +23,34 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
   }
 
   try {
-    const { script } = await generateStoryScript({ prompt });
+    const scriptResult = await generateStoryScript({ prompt });
 
-    if (!script) {
-        return { error: 'Failed to generate story script.' };
+    if (!scriptResult || !scriptResult.script) {
+        return { error: 'Failed to generate story script. The result was empty.' };
     }
+    const script = scriptResult.script;
 
-    const [visualResult, voiceoverResult] = await Promise.all([
+    const [visualResult, voiceoverResult] = await Promise.allSettled([
       generateCinematicVisual({ storyScript: script }),
       generateDramaticVoiceover({ script: script }),
     ]);
 
-    if (!visualResult.visualDataUri) {
-        return { error: 'Failed to generate cinematic visual.' };
+    if (visualResult.status === 'rejected' || !visualResult.value.visualDataUri) {
+        const reason = visualResult.status === 'rejected' ? visualResult.reason.message : 'The result was empty.';
+        console.error('Visual generation failed:', reason);
+        return { error: `Failed to generate cinematic visual: ${reason}` };
     }
 
-    if (!voiceoverResult.media) {
-        return { error: 'Failed to generate voiceover.' };
+    if (voiceoverResult.status === 'rejected' || !voiceoverResult.value.media) {
+        const reason = voiceoverResult.status === 'rejected' ? voiceoverResult.reason.message : 'The result was empty.';
+        console.error('Voiceover generation failed:', reason);
+        return { error: `Failed to generate voiceover: ${reason}` };
     }
 
     return {
       script,
-      visualDataUri: visualResult.visualDataUri,
-      voiceoverMedia: voiceoverResult.media,
+      visualDataUri: visualResult.value.visualDataUri,
+      voiceoverMedia: voiceoverResult.value.media,
     };
   } catch (e: any) {
     console.error('Story generation failed:', e);
