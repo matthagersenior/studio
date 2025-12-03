@@ -39,11 +39,11 @@ const generateDramaticVoiceoverFlow = ai.defineFlow(
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' },
+            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
           },
         },
       },
-      prompt: input.script,
+      prompt: `Narrate in an extremely fast, high-pitched, and slightly frantic voice: ${input.script}`,
     });
     if (!media) {
       throw new Error('no media returned');

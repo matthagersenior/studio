@@ -34,7 +34,10 @@ const generateCinematicVisualFlow = ai.defineFlow(
   async input => {
     const {media} = await ai.generate({
       model: 'googleai/imagen-4.0-fast-generate-001',
-      prompt: `Generate a cinematic visual based on the following story script: ${input.storyScript}`,
+      prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd scene: ${input.storyScript}`,
+      config: {
+          aspectRatio: "16:9",
+      }
     });
 
     if (!media || !media.url) {

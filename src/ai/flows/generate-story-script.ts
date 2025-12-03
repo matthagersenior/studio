@@ -35,7 +35,7 @@ const generateStoryScriptFlow = ai.defineFlow(
   },
   async input => {
     const {text} = await ai.generate({
-      prompt: `You are a script writer for short cinematic stories. Generate a short story script based on the user's prompt, optimized for cinematic visuals.\n\nPrompt: ${input.prompt}`,
+      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The output must be 2-4 sentences long and include a clear, strange visual description. Use a dramatic, high-energy tone. Prompt: ${input.prompt}`,
     });
     return { script: text };
   }

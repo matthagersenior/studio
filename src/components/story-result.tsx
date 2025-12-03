@@ -1,36 +1,40 @@
+"use client";
+
 import Image from "next/image";
-import { Card, CardContent } from "./ui/card";
 import { AudioPlayer } from "./audio-player";
-import { ScrollArea } from "./ui/scroll-area";
+import { Button } from "./ui/button";
 
 interface StoryResultProps {
   script: string;
   visualDataUri: string;
   voiceoverMedia: string;
+  onReset: () => void;
 }
 
-export function StoryResult({ script, visualDataUri, voiceoverMedia }: StoryResultProps) {
+export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: StoryResultProps) {
   return (
-    <Card className="bg-card/80 backdrop-blur-sm border-border/30 shadow-xl">
-      <CardContent className="p-4 md:p-6">
-        <div className="grid md:grid-cols-2 gap-6 items-start">
-          <div className="relative aspect-square rounded-lg overflow-hidden border shadow-inner">
-            <Image
-              src={visualDataUri}
-              alt="Generated cinematic visual"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-          <div className="flex flex-col gap-4 max-h-[70vh] md:max-h-[25.75rem]">
-            <AudioPlayer src={voiceoverMedia} />
-            <ScrollArea className="flex-grow border rounded-lg p-4 bg-background/50">
-              <p className="whitespace-pre-wrap text-sm text-foreground">{script}</p>
-            </ScrollArea>
-          </div>
+    <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
+      <div className="relative w-full max-w-4xl aspect-[16/9] rounded-xl overflow-hidden shadow-2xl shadow-primary/20 border border-primary/20">
+        <Image
+          src={visualDataUri}
+          alt="Generated cinematic visual"
+          fill
+          className="object-cover"
+          sizes="100vw"
+        />
+        <div 
+          className="absolute bottom-0 left-0 right-0 p-8 text-center text-white font-semibold text-lg"
+          style={{ background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0))', textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
+        >
+          {script}
         </div>
-      </CardContent>
-    </Card>
+        <div className="absolute top-4 left-4 right-4 md:left-auto md:right-4">
+            <AudioPlayer src={voiceoverMedia} />
+        </div>
+        <Button onClick={onReset} className="absolute bottom-4 right-4 text-xs underline" variant="link">
+            ROTTEN ENOUGH (Start Over)
+        </Button>
+      </div>
+    </div>
   );
 }
