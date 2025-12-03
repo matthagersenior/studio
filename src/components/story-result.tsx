@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { AudioPlayer } from "./audio-player";
 import { Button } from "./ui/button";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface StoryResultProps {
   script: string;
@@ -34,10 +35,15 @@ export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: 
 
         {/* Script Text */}
         <div 
-          className="w-full text-center text-white font-semibold text-lg p-4 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-8 md:bg-gradient-to-t md:from-black/80 md:to-transparent"
+          className="w-full text-center text-white font-semibold text-lg p-4 flex-grow min-h-0 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-8 md:bg-gradient-to-t md:from-black/80 md:to-transparent md:flex-grow-0 md:min-h-0"
           style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
         >
-          {script}
+          {/* ScrollArea for mobile view to handle long text */}
+          <ScrollArea className="h-full md:h-auto">
+            <div className="p-2 md:p-0">
+              {script}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Audio Player */}
@@ -47,7 +53,7 @@ export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: 
 
         {/* Reset Button */}
         <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0">
-            <Button onClick={onReset} className="text-xs underline" variant="link">
+            <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
                 ROTTEN ENOUGH (Start Over)
             </Button>
         </div>
