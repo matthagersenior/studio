@@ -5,3 +5,10 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+# This section makes secrets from Google Cloud Secret Manager available as
+# environment variables to your running application.
+secretEnvironmentVariables:
+  - key: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+    # By default, the latest version of the secret is used. You can specify a
+    # specific version if needed, e.g., "version: 2"
