@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
 import { Loader2 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 
 import type { GenerationResult } from "@/app/actions";
 
@@ -63,21 +62,21 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8">
+    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
       <div className="max-w-4xl mx-auto space-y-8 w-full">
         <header className="text-center">
-          <h1 className="text-3xl md:text-5xl font-bold text-foreground font-headline">
+          <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">
             AI BRAIN ROT
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-gray-400 mt-2">
             Let's See What We Can Come Up With
           </p>
         </header>
 
-        <Card className="bg-card/80 backdrop-blur-sm border-border/30 shadow-2xl">
+        <Card className="bg-white/80 backdrop-blur-sm border-gray-200/30 shadow-2xl">
           <CardHeader>
-            <CardTitle>Create Your Story</CardTitle>
-            <CardDescription>Enter a prompt and let AI do the rest.</CardDescription>
+            <CardTitle className="text-gray-800">Create Your Story</CardTitle>
+            <CardDescription className="text-gray-600">Enter a prompt and let AI do the rest.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -91,7 +90,7 @@ export default function Home() {
                       <FormControl>
                         <Textarea
                           placeholder="e.g., A jellyfish riding a bicycle in Paris"
-                          className="resize-none bg-background/50 text-base"
+                          className="resize-none bg-white/50 text-base text-gray-800"
                           rows={3}
                           {...field}
                         />
@@ -100,7 +99,7 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading} className="w-full text-lg font-semibold py-6">
+                <Button type="submit" disabled={isLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-6 w-6 animate-spin" />
@@ -114,14 +113,6 @@ export default function Home() {
             </Form>
           </CardContent>
         </Card>
-
-        {isLoading && (
-          <div className="text-center p-6 rounded-xl font-medium text-foreground" role="status">
-            <Loader2 className="animate-spin h-8 w-8 text-foreground inline-block mb-3" />
-            <p>Reading your mind, quit being so pushy...</p>
-          </div>
-        )}
-
       </div>
     </main>
   );

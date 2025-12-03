@@ -39,11 +39,11 @@ const generateDramaticVoiceoverFlow = ai.defineFlow(
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
+            prebuiltVoiceConfig: { voiceName: 'Enif' },
           },
         },
       },
-      prompt: `Narrate in an extremely fast, high-pitched, and slightly frantic voice: ${input.script}`,
+      prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${input.script}`,
     });
     if (!media) {
       throw new Error('no media returned');
