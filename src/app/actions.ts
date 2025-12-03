@@ -47,8 +47,8 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       visualDataUri: visualResult.visualDataUri,
       voiceoverMedia: voiceoverResult.media,
     };
-  } catch (e) {
+  } catch (e: any) {
     console.error('Story generation failed:', e);
-    return { error: 'An unexpected error occurred during generation. Please try again later.' };
+    return { error: e.message || 'An unexpected error occurred during generation. Please try again later.' };
   }
 }

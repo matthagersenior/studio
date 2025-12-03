@@ -27,13 +27,6 @@ export async function generateStoryScript(input: GenerateStoryScriptInput): Prom
   return generateStoryScriptFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateStoryScriptPrompt',
-  input: {schema: GenerateStoryScriptInputSchema},
-  output: {schema: GenerateStoryScriptOutputSchema},
-  prompt: `You are a script writer for short cinematic stories. Generate a short story script based on the user's prompt, optimized for cinematic visuals.\n\nPrompt: {{{prompt}}}`,
-});
-
 const generateStoryScriptFlow = ai.defineFlow(
   {
     name: 'generateStoryScriptFlow',
@@ -41,7 +34,12 @@ const generateStoryScriptFlow = ai.defineFlow(
     outputSchema: GenerateStoryScriptOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const {text} = await ai.generate({
+      prompt: `You are a script writer for short cinematic stories. Generate a short story script based on the user's prompt, optimized for cinematic visuals.\n\nPrompt: ${input.prompt}`,
+      output: {
+        schema: GenerateStoryScriptOutputSchema,
+      },
+    });
+    return { script: text };
   }
 );

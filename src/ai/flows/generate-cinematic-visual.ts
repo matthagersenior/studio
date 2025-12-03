@@ -25,13 +25,6 @@ export async function generateCinematicVisual(input: GenerateCinematicVisualInpu
   return generateCinematicVisualFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateCinematicVisualPrompt',
-  input: {schema: GenerateCinematicVisualInputSchema},
-  output: {schema: GenerateCinematicVisualOutputSchema},
-  prompt: `You are a visual artist specializing in cinematic visuals. Generate a visual based on the following story script:\n\n{{{storyScript}}}`,
-});
-
 const generateCinematicVisualFlow = ai.defineFlow(
   {
     name: 'generateCinematicVisualFlow',
@@ -41,7 +34,7 @@ const generateCinematicVisualFlow = ai.defineFlow(
   async input => {
     const {media} = await ai.generate({
       model: 'googleai/imagen-4.0-fast-generate-001',
-      prompt: input.storyScript,
+      prompt: `Generate a cinematic visual based on the following story script: ${input.storyScript}`,
     });
 
     if (!media || !media.url) {
