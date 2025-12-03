@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import FirebaseAuthProvider from '@/components/firebase-auth-provider';
 
 export const metadata: Metadata = {
   title: 'Brainrot Creator',
@@ -28,7 +29,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>{children}</FirebaseClientProvider>
+        <FirebaseClientProvider>
+          <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
