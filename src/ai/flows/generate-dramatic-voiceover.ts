@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -39,7 +40,7 @@ const generateDramaticVoiceoverFlow = ai.defineFlow(
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Enif' },
+            prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
           },
         },
       },
