@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "Prompt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Prompt",
+      "type": "object",
+      "description": "Represents a user-provided prompt for content generation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the prompt."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created the prompt. (Relationship: User 1:N Prompt)"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content of the prompt."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the prompt was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "text",
+        "createdAt"
+      ]
+    },
+    "GeneratedContent": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GeneratedContent",
+      "type": "object",
+      "description": "Represents the generated story script, visual, and voiceover based on a prompt.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the generated content."
+        },
+        "promptId": {
+          "type": "string",
+          "description": "Reference to the Prompt used to generate this content. (Relationship: Prompt 1:1 GeneratedContent)"
+        },
+        "storyScript": {
+          "type": "string",
+          "description": "The generated short story script."
+        },
+        "visualUrl": {
+          "type": "string",
+          "description": "URL of the generated cinematic visual (image).",
+          "format": "uri"
+        },
+        "voiceoverUrl": {
+          "type": "string",
+          "description": "URL of the generated voiceover narration.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the content was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "promptId",
+        "storyScript",
+        "visualUrl",
+        "voiceoverUrl",
+        "createdAt"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the application. User authentication details (e.g., passwords) are assumed to be handled by an external system (Firebase Authentication).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's chosen username."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user information. Includes user's email, username, and creation timestamp.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/prompts/{promptId}",
+        "definition": {
+          "entityName": "Prompt",
+          "schema": {
+            "$ref": "#/backend/entities/Prompt"
+          },
+          "description": "Stores prompts created by the user.  The path enforces ownership: only the user with the matching userId can access prompts in this collection.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "promptId",
+              "description": "The unique identifier for the prompt."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/generatedContent/{generatedContentId}",
+        "definition": {
+          "entityName": "GeneratedContent",
+          "schema": {
+            "$ref": "#/backend/entities/GeneratedContent"
+          },
+          "description": "Stores generated content associated with a user's prompt. The path enforces ownership: only the user with the matching userId can access generated content in this collection.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "generatedContentId",
+              "description": "The unique identifier for the generated content."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to securely manage user prompts and generated content within the Brainrot Creator application. It emphasizes authorization independence, clarity, and scalability. Path-based ownership is used to secure user-specific data, ensuring that only the owning user can access their prompts and generated content. This approach eliminates the need for complex security rules with `get()` calls, enhancing performance and security. The structure facilitates secure listing of prompts and generated content within a user's scope, avoiding rules that act as filters.\n\nSpecifically, the `prompts` and `generatedContent` collections are structured as subcollections under each user's document (`/users/{userId}/prompts/{promptId}` and `/users/{userId}/generatedContent/{generatedContentId}`). This ensures that each user can only access their own data. The denormalization strategy is not needed in this specific design because the collections are already nested under each user's document, thus providing implicit ownership based on the path."
+  }
+}

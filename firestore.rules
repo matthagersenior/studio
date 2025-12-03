@@ -1,0 +1,156 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model. All user-generated data,
+ * including prompts and their resulting content, is stored in subcollections under that user's
+ * specific document. This ensures that a user's data is completely isolated and accessible only
+ * to them.
+ *
+ * Data Structure: The data is organized hierarchically. A top-level `/users` collection holds
+ * individual user documents. All other data, such as `/prompts` and `/generatedContent`, exists
+ * exclusively as subcollections within a `/users/{userId}` document.
+ *
+ * Key Security Decisions:
+ * - User Enumeration is Disabled: Listing the top-level `/users` collection is strictly forbidden
+ *   to prevent malicious actors from harvesting a list of all application users.
+ * - Path-Based Security: Authorization is primarily determined by the document path. If a user's
+ *   authenticated UID matches the `{userId}` in the path, access is granted. This is highly
+ *   performant as it avoids extra database reads (`get()`) for authorization checks.
+ * - Private User Profiles: A user's own profile data in `/users/{userId}` is readable only by them.
+ * - Relational Integrity: On creation, documents must correctly reference their parent owner
+ *   (e.g., a new Prompt must contain a `userId` field that matches the path). This field is then
+ *   enforced as immutable to prevent re-association.
+ *
+ * Denormalization for Authorization: This ruleset relies on path-based security, a highly efficient
+ * pattern that avoids the need for denormalizing ownership data. The ownership is implicitly
+ * defined by the document's location in the `/users/{userId}` data tree.
+ *
+ * Structural Segregation: The design naturally segregates each user's private data into their own
+ * document tree, which is the most secure and performant structure for this type of application.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user's UID matches the provided userId.
+     * This is the primary function for enforcing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Ensures the document already exists and the user is the owner.
+     * CRITICAL for safe update and delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // --- User Data Validation ---
+
+    /**
+     * Validates a user creating their own document.
+     * Ensures the document ID in the path matches the internal `id` field.
+     */
+    function isCreatingOwnUserDocument(userId) {
+      return isOwner(userId) && request.resource.data.id == userId;
+    }
+    
+    /**
+     * Validates a user updating their own document.
+     * Ensures the internal `id` field is immutable.
+     */
+    function isUpdatingOwnUserDocument(userId) {
+      return isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+    }
+
+    // --- Prompt Data Validation ---
+    
+    /**
+     * Validates a user creating their own prompt.
+     * Ensures the internal `userId` field matches the owner's ID from the path.
+     */
+    function isCreatingOwnPrompt(userId) {
+      return isOwner(userId) && request.resource.data.userId == userId;
+    }
+
+    /**
+     * Validates a user updating their own prompt.
+     * Ensures the internal `userId` is immutable.
+     */
+    function isUpdatingOwnPrompt(userId) {
+      return isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages user profile documents.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user can create their own user document.
+     * @deny (get) A user cannot read another user's profile.
+     * @deny (list) No one can list all users in the application.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      // READs: Only the owner can read their own profile. Listing is disallowed.
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      // WRITEs: A user can create their own profile, update it, and delete it.
+      allow create: if isCreatingOwnUserDocument(userId);
+      allow update: if isUpdatingOwnUserDocument(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages user-created prompts.
+     * @path /users/{userId}/prompts/{promptId}
+     * @allow (create) An authenticated user can create a prompt under their own user ID.
+     * @deny (get) A user cannot read prompts belonging to another user.
+     * @principle Enforces strict ownership for all user-generated content.
+     */
+    match /users/{userId}/prompts/{promptId} {
+      // READs: Only the owner can get or list their own prompts.
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      // WRITEs: Owner has full control, with validation on the `userId` field.
+      allow create: if isCreatingOwnPrompt(userId);
+      allow update: if isUpdatingOwnPrompt(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages content generated from a user's prompt.
+     * @path /users/{userId}/generatedContent/{generatedContentId}
+     * @allow (create) An authenticated user can save generated content under their own user ID.
+     * @deny (update) A user cannot modify generated content belonging to another user.
+     * @principle Enforces strict ownership for all user-generated content.
+     */
+    match /users/{userId}/generatedContent/{generatedContentId} {
+      // READs: Only the owner can get or list their own generated content.
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      // WRITEs: Owner has full control over their generated content.
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
