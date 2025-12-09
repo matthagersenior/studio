@@ -67,7 +67,7 @@ export default function Home() {
           });
           // Keep showing audio/script even if video fails
           setLoadingState('idle'); 
-        } else {
+        } else if (videoResult.videoUrl) {
           setVideoUrl(videoResult.videoUrl);
           setLoadingState('idle');
         }

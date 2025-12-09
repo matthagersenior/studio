@@ -24,7 +24,7 @@ export type StoryGenerationResult = {
 
 async function generateScript(prompt: string): Promise<string> {
   const scriptResponse = await ai.generate({
-    prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Prompt: ${prompt}`,
+    prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
   });
   
   let script = scriptResponse.text;
@@ -95,11 +95,12 @@ export async function generateVideo(script: string): Promise<VideoResult | Story
         throw new Error('Failed to find the generated video in operation result.');
     }
     
+    // The key must be appended to the URL to make it accessible
     return { videoUrl: `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}` };
   } catch(e: any) {
     console.error('Video generation failed:', e);
     const errorMessage = e.message || 'An unexpected error occurred during video generation.';
-     if (errorMessage.includes('429')) {
+     if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
         return { error: "We're experiencing high demand for video right now. Please try again later." };
     }
     return { error: errorMessage };
@@ -120,14 +121,14 @@ export async function generateScriptAndVoiceover(prompt: string): Promise<Script
       audioUrl: voiceoverResult.audioUrl,
     };
   } catch (e: any) {
-    console.error('Story generation failed:', e);
-    const errorMessage = e.message || 'An unexpected error occurred during story generation.';
+    console.error('Script and voiceover generation failed:', e);
+    const errorMessage = e.message || 'An unexpected error occurred during initial generation.';
     
-    if (errorMessage.includes('429')) {
+    if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
         return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
     }
-    if (errorMessage.includes('violate Gemini API')) {
-        return { error: "The prompt could not be submitted. This prompt contains words that violate Gemini API's usage guidelines. Try rephrasing the prompt. If you think this was an error, send feedback." };
+    if (errorMessage.includes('safety policies') || errorMessage.includes('violates our policies')) {
+        return { error: "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt." };
     }
     
     return { error: errorMessage };
