@@ -52,11 +52,9 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       prompt: cleanScript,
       config: {
         responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: 'vindemiatrix',
-            }
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: 'vindemiatrix',
           }
         }
       },
@@ -71,7 +69,10 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     // Estimate duration based on script length (words per minute)
     const words = cleanScript.split(/\s+/);
-    const estimatedDuration = Math.max(5, Math.ceil(words.length / (150 / 60))); // 150 WPM, min 5 seconds
+    // VEO model requires duration between 5 and 8 seconds.
+    const calculatedDuration = Math.ceil(words.length / (150 / 60)); // 150 WPM
+    const estimatedDuration = Math.max(5, Math.min(8, calculatedDuration));
+
 
     // 3. Generate Video with the estimated duration
     let videoOperation = (await ai.generate({
