@@ -8,13 +8,14 @@ import Image from 'next/image';
 
 interface StoryResultProps {
   script: string;
-  visualUrl: string;
+  imageUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
+  generationTime: number;
   onReset: () => void;
 }
 
-export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, onReset }: StoryResultProps) {
+export function StoryResult({ script, imageUrl, voiceoverMedia, audioDuration, generationTime, onReset }: StoryResultProps) {
   const [startPlayback, setStartPlayback] = useState(false);
 
   useEffect(() => {
@@ -29,14 +30,13 @@ export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, 
       <div className="w-full max-w-4xl h-full flex flex-col md:aspect-[16/9] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         
         <div className="relative w-full aspect-[16/9] md:h-full rounded-lg overflow-hidden shrink-0">
-          <video
-            key={visualUrl}
-            src={`${visualUrl}&key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`}
+          <Image
+            key={imageUrl}
+            src={imageUrl}
+            alt="Generated cinematic visual"
             className="absolute top-0 left-0 w-full h-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
+            fill
+            unoptimized
           />
            <div className="md:hidden absolute inset-0 bg-black/30 flex items-center justify-center">
             <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
@@ -56,6 +56,10 @@ export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, 
 
         <div className="w-full mt-auto hidden md:flex md:absolute md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:mt-0 md:w-auto">
             <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
+        </div>
+
+        <div className="absolute top-2 left-2 text-white/50 text-xs font-mono bg-black/50 px-2 py-1 rounded">
+          Generated in {generationTime.toFixed(2)}s
         </div>
 
         <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0">

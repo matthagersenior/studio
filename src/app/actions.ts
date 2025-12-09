@@ -5,20 +5,23 @@ import { toWav } from "@/lib/wav-converter";
 
 export type GenerationResult = {
   script: string;
-  visualUrl: string;
+  imageUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
+  generationTime: number;
   error?: never;
 } | {
   script?: never;
-  visualUrl?: never;
+  imageUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
+  generationTime?: never;
   error: string;
 };
 
 
 export async function generateStory(prompt: string): Promise<GenerationResult> {
+  const startTime = Date.now();
 
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -34,8 +37,15 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return { error: 'Failed to generate story script.' };
     }
 
-    // 2. Generate Voiceover and determine its duration first
-    const voiceoverResult = await ai.generate({
+    // 2. Generate Image and Voiceover in Parallel
+    const [imageResult, voiceoverResult] = await Promise.allSettled([
+      // Generate Image
+      ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
+      }),
+      // Generate Voiceover
+      ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
           responseModalities: ['AUDIO'],
@@ -46,74 +56,47 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
           },
         },
         prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
-    });
+      })
+    ]);
+
+    // 3. Process results
+    let imageUrl: string;
+    if (imageResult.status === 'fulfilled' && imageResult.value.media.url) {
+      imageUrl = imageResult.value.media.url;
+    } else {
+      const reason = imageResult.status === 'rejected' ? imageResult.reason.message : 'Image generation result was empty.';
+      console.error('Image generation failed:', reason);
+      throw new Error(`Failed to generate visual. Reason: ${reason}`);
+    }
 
     let voiceoverMedia: string;
-    let audioBuffer: Buffer;
     let audioDuration: number;
-
-    if (voiceoverResult.media.url) {
-        audioBuffer = Buffer.from(
-            voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
-            'base64'
-        );
-        voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
-        
-        // Calculate audio duration
-        const sampleRate = 24000; // As per the model's output
-        const bitDepth = 16; // PCM16
-        const channels = 1; // Mono
-        audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
-
+    if (voiceoverResult.status === 'fulfilled' && voiceoverResult.value.media.url) {
+      const audioBuffer = Buffer.from(
+        voiceoverResult.value.media.url.substring(voiceoverResult.value.media.url.indexOf(',') + 1),
+        'base64'
+      );
+      voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+      
+      const sampleRate = 24000;
+      const bitDepth = 16;
+      const channels = 1;
+      audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
     } else {
-        console.error('Voiceover generation failed: result was empty.');
-        return { error: `Failed to generate voiceover.` };
-    }
-
-    // 3. Generate Video with optimized duration
-    // Veo supports 5-8 seconds. Let's clamp the duration.
-    const videoDuration = Math.max(5, Math.min(8, Math.ceil(audioDuration)));
-
-    const videoOpResult = await ai.generate({
-        model: 'googleai/veo-2.0-generate-001',
-        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
-        config: {
-            durationSeconds: videoDuration,
-            aspectRatio: '16:9',
-        },
-    });
-
-
-    // 4. Process Video Result (Polling)
-    let visualUrl: string;
-    if (videoOpResult.operation) {
-        let operation = videoOpResult.operation;
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before checking again
-            operation = await ai.checkOperation(operation);
-        }
-
-        if (operation.error) {
-            throw new Error(`Video generation failed: ${operation.error.message}`);
-        }
-
-        const video = operation.output?.message?.content.find(p => !!p.media);
-        if (!video || !video.media?.url) {
-            throw new Error('Failed to find the generated video in operation result.');
-        }
-        visualUrl = video.media.url;
-
-    } else {
-        const reason = 'Video generation operation did not start.';
-        console.error('Video generation failed:', reason);
-        throw new Error(reason);
+      const reason = voiceoverResult.status === 'rejected' ? voiceoverResult.reason.message : 'Voiceover generation result was empty.';
+      console.error('Voiceover generation failed:', reason);
+      throw new Error(`Failed to generate voiceover. Reason: ${reason}`);
     }
     
+    const endTime = Date.now();
+    const generationTime = (endTime - startTime) / 1000;
+
     return {
       script: script.replace(/---/g, '\n\n'),
-      visualUrl,
+      imageUrl,
       voiceoverMedia,
       audioDuration,
+      generationTime,
     };
 
   } catch (e: any) {
