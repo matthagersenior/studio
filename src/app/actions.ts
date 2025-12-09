@@ -6,8 +6,9 @@ import { toWav } from "@/lib/wav-converter";
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
-  videoUrl?: string; // Optional: for the single video case
-  videoUrls?: string[]; // Optional: for the video sequence case
+  videoUrl?: string;
+  videoUrls?: string[];
+  imageUrls?: string[];
   error?: never;
 };
 
@@ -36,7 +37,7 @@ async function generateVoiceover(script: string): Promise<string> {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' }, // A dramatic voice
+            prebuiltVoiceConfig: { voiceName: 'Algenib' },
           },
         },
     },
@@ -103,14 +104,14 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
 }
 
 async function generateVideoSequence(script: string): Promise<string[]> {
-    console.log("Fallback: Generating video sequence.");
+    console.log("Fallback 1: Generating video sequence.");
     const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const videoClipPromises = sentences.map(async (sentence) => {
         let videoOperation = (await ai.generate({
             model: 'googleai/veo-2.0-generate-001',
             prompt: `Create a short, surreal, and chaotic video clip for the following line: "${sentence}"`,
             config: {
-                durationSeconds: 5, // A valid, fixed duration for each clip
+                durationSeconds: 5,
                 aspectRatio: '9:16',
             },
         })).operation;
@@ -126,7 +127,6 @@ async function generateVideoSequence(script: string): Promise<string[]> {
 
         if (videoOperation.error) {
             console.error(`Video clip generation failed for sentence: "${sentence}"`, videoOperation.error);
-            // In a real app, you might want a placeholder or retry, but here we'll throw
             throw new Error(`Failed to generate a video clip: ${videoOperation.error.message}`);
         }
 
@@ -141,6 +141,28 @@ async function generateVideoSequence(script: string): Promise<string[]> {
     return Promise.all(videoClipPromises);
 }
 
+async function generateImageSequence(script: string): Promise<string[]> {
+    console.log("Fallback 2: Generating image sequence.");
+    const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const imagePromises = sentences.map(sentence => 
+        ai.generate({
+            model: 'googleai/imagen-4.0-fast-generate-001',
+            prompt: `Create a cinematic, surreal, and meme-worthy image for the following line: "${sentence}". Style: dramatic, high-energy, absurd. 9:16 aspect ratio.`,
+        })
+    );
+
+    const imageResponses = await Promise.all(imagePromises);
+    
+    return imageResponses.map((response, index) => {
+        if (!response.media?.url) {
+            console.error(`Failed to generate image for sentence: "${sentences[index]}"`);
+            // Return a placeholder or handle the error as needed
+            return "https://placehold.co/540x960/black/white?text=Error";
+        }
+        return response.media.url;
+    });
+}
+
 
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
@@ -152,18 +174,30 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const audioUrl = await generateVoiceover(script);
     
     try {
+      console.log("Attempting primary video generation...");
       const initialImage = await generateInitialImage(prompt);
       const videoUrl = await generateVideoFromImage(script, initialImage);
       return { script, audioUrl, videoUrl };
-    } catch (videoError: any) {
-        const errorMessage = videoError.message || '';
-        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota') || errorMessage.includes('high demand')) {
-            console.warn("Primary video generation failed due to rate limits. Attempting fallback to video sequence.");
-            const videoUrls = await generateVideoSequence(script);
-            return { script, audioUrl, videoUrls };
+    } catch (primaryError: any) {
+        const isRateLimitError = (msg: string) => msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('quota') || msg.includes('high demand');
+        
+        if (isRateLimitError(primaryError.message || '')) {
+            console.warn("Primary video generation failed due to rate limits. Attempting fallback 1 (video sequence).");
+            try {
+                const videoUrls = await generateVideoSequence(script);
+                return { script, audioUrl, videoUrls };
+            } catch (fallback1Error: any) {
+                if (isRateLimitError(fallback1Error.message || '')) {
+                    console.warn("Fallback 1 (video sequence) failed due to rate limits. Attempting fallback 2 (image sequence).");
+                    const imageUrls = await generateImageSequence(script);
+                    return { script, audioUrl, imageUrls };
+                }
+                // If the video sequence fallback failed for a different reason, throw that error
+                throw fallback1Error;
+            }
         }
-        // If it's a different error, re-throw to be caught by the outer block
-        throw videoError;
+        // If it's a different error from the primary generation, re-throw it
+        throw primaryError;
     }
 
   } catch (e: any) {

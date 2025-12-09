@@ -4,24 +4,27 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX } from "lucide-react";
+import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
   audioUrl: string;
   videoUrl?: string;
   videoUrls?: string[];
+  imageUrls?: string[];
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [currentVisualIndex, setCurrentVisualIndex] = useState(0);
   
   const [isMuted, setIsMuted] = useState(true);
   const [audioDuration, setAudioDuration] = useState(0);
 
   const allVideos = videoUrl ? [videoUrl] : videoUrls || [];
+  const isImageSequence = imageUrls && imageUrls.length > 0;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -44,13 +47,16 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
     playMedia();
 
     const handleTimeUpdate = () => {
-      if (!allVideos || allVideos.length <= 1 || !audioDuration) return;
+      if (!audioDuration) return;
+
+      const visualAssets = isImageSequence ? imageUrls : allVideos;
+      if (!visualAssets || visualAssets.length <= 1) return;
 
       const progress = audio.currentTime / audioDuration;
-      const newIndex = Math.floor(progress * allVideos.length);
+      const newIndex = Math.floor(progress * visualAssets.length);
       
-      if (newIndex !== currentVideoIndex) {
-        setCurrentVideoIndex(newIndex);
+      if (newIndex !== currentVisualIndex) {
+        setCurrentVisualIndex(newIndex);
       }
     };
 
@@ -60,14 +66,14 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
 
-  }, [audioUrl, isMuted, allVideos, audioDuration, currentVideoIndex]);
+  }, [audioUrl, isMuted, allVideos, imageUrls, isImageSequence, audioDuration, currentVisualIndex]);
 
   useEffect(() => {
-    if (videoRef.current && allVideos[currentVideoIndex]) {
-      videoRef.current.src = allVideos[currentVideoIndex];
+    if (videoRef.current && allVideos[currentVisualIndex]) {
+      videoRef.current.src = allVideos[currentVisualIndex];
       videoRef.current.play().catch(e => console.error("Could not play video clip.", e));
     }
-  }, [currentVideoIndex, allVideos]);
+  }, [currentVisualIndex, allVideos]);
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
@@ -86,29 +92,52 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
     }
   };
 
-  const isLooping = allVideos.length === 1;
+  const isLoopingVideo = allVideos.length === 1;
+
+  const renderVisuals = () => {
+    if (isImageSequence) {
+      return (
+        <Image
+          key={imageUrls[currentVisualIndex]}
+          src={imageUrls[currentVisualIndex]}
+          alt="Generated story visual"
+          fill
+          className="object-cover"
+          unoptimized
+        />
+      );
+    }
+    
+    if (allVideos.length > 0) {
+       return (
+        <video
+          ref={videoRef}
+          key={allVideos[currentVisualIndex]}
+          className="absolute top-0 left-0 w-full h-full object-cover"
+          loop={isLoopingVideo}
+          muted
+          playsInline
+          autoPlay
+        />
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <audio
         ref={audioRef}
         src={audioUrl}
-        loop={isLooping}
+        loop={isLoopingVideo || isImageSequence}
         playsInline
         muted={isMuted}
         onLoadedMetadata={handleAudioMetadata}
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
-          <video
-            ref={videoRef}
-            key={allVideos[currentVideoIndex]}
-            className="absolute top-0 left-0 w-full h-full object-cover"
-            loop={isLooping}
-            muted
-            playsInline
-            autoPlay
-          />
+          {renderVisuals()}
         </div>
 
         <div

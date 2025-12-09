@@ -64,6 +64,7 @@ export default function Home() {
         audioUrl={generationResult.audioUrl}
         videoUrl={generationResult.videoUrl}
         videoUrls={generationResult.videoUrls}
+        imageUrls={generationResult.imageUrls}
         onReset={resetApp}
       />
     );
