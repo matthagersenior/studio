@@ -5,13 +5,13 @@ import { toWav } from "@/lib/wav-converter";
 
 export type GenerationResult = {
   script: string;
-  visualUrl: string; // Changed from visualUrls
+  visualUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
   error?: never;
 } | {
   script?: never;
-  visualUrl?: never; // Changed from visualUrls
+  visualUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
   error: string;
