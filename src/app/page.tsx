@@ -57,7 +57,13 @@ export default function Home() {
 
   if (result && !result.error) {
     return (
-      <StoryResult script={result.script} visualUrl={result.visualUrl} voiceoverMedia={result.voiceoverMedia} onReset={resetApp} />
+      <StoryResult 
+        script={result.script} 
+        visualUrls={result.visualUrls} 
+        voiceoverMedia={result.voiceoverMedia} 
+        audioDuration={result.audioDuration}
+        onReset={resetApp} 
+      />
     )
   }
 
