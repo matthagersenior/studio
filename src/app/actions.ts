@@ -55,7 +55,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: 'Vesta',
+              voiceName: 'vindemiatrix',
             }
           }
         }
