@@ -81,7 +81,7 @@ export default function Home() {
             height={300}
             unoptimized
         />
-        <p className="mt-4 text-lg font-mono">Engaging Brainrot...</p>
+        <p className="mt-4 text-lg font-mono">Reading your mind...</p>
       </main>
     );
   }
