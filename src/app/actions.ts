@@ -46,9 +46,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       })
     );
 
-    const [voiceoverResult, ...visualResults] = await Promise.allSettled([
-      // Generate Dramatic Voiceover for the whole script
-      ai.generate({
+    const voiceoverPromise = ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
           responseModalities: ['AUDIO'],
@@ -59,22 +57,14 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
           },
         },
         prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script.replace(/---/g, ' ')}`,
-      }),
+      });
+
+    const [voiceoverResult, ...visualResults] = await Promise.allSettled([
+      voiceoverPromise,
       ...visualPromises
     ]);
 
-    // 3. Process Visual Results
-    const visualUrls = visualResults.map((result, index) => {
-        if (result.status === 'fulfilled' && result.value.media.url) {
-            return result.value.media.url;
-        } else {
-            const reason = result.status === 'rejected' ? result.reason.message : `Image generation for scene ${index + 1} was empty.`;
-            console.error(`Image generation for scene ${index + 1} failed:`, reason);
-            throw new Error(reason);
-        }
-    });
-
-    // 4. Process Voiceover Result
+    // 3. Process Voiceover Result
     let voiceoverMedia: string;
     let audioBuffer: Buffer;
     if (voiceoverResult.status === 'fulfilled' && voiceoverResult.value.media.url) {
@@ -84,11 +74,22 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       );
       voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
     } else {
-      const reason = voiceoverResult.status === 'rejected' ? voiceoverResult.reason.message : 'Voiceover generation result was empty.';
+      const reason = voiceoverResult.status === 'rejected' ? (voiceoverResult.reason as Error).message : 'Voiceover generation result was empty.';
       console.error('Voiceover generation failed:', reason);
       return { error: `Failed to generate voiceover: ${reason}` };
     }
     
+    // 4. Process Visual Results
+    const visualUrls = visualResults.map((result, index) => {
+        if (result.status === 'fulfilled' && result.value.media.url) {
+            return result.value.media.url;
+        } else {
+            const reason = result.status === 'rejected' ? (result.reason as Error).message : `Image generation for scene ${index + 1} was empty.`;
+            console.error(`Image generation for scene ${index + 1} failed:`, reason);
+            throw new Error(reason);
+        }
+    });
+
     const sampleRate = 24000;
     const bitDepth = 16;
     const channels = 1;
