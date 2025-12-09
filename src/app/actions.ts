@@ -5,13 +5,13 @@ import { toWav } from "@/lib/wav-converter";
 
 export type GenerationResult = {
   script: string;
-  imageUrl: string;
+  videoUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
   error?: never;
 } | {
   script?: never;
-  imageUrl?: never;
+  videoUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
   error: string;
@@ -34,43 +34,26 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return { error: 'Failed to generate story script.' };
     }
 
-    // 2. Generate Image and Voiceover in Parallel
-    const [imageResult, voiceoverResult] = await Promise.allSettled([
-      // Generate Image
-      ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
-      }),
-      // Generate Voiceover
-      ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
-            },
+    // 2. Generate Voiceover first to get duration
+    const voiceoverResult = await ai.generate({
+      model: 'googleai/gemini-2.5-flash-preview-tts',
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
           },
         },
-        prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
-      })
-    ]);
-
-    // 3. Process results
-    let imageUrl: string;
-    if (imageResult.status === 'fulfilled' && imageResult.value.media.url) {
-      imageUrl = imageResult.value.media.url;
-    } else {
-      const reason = imageResult.status === 'rejected' ? imageResult.reason.message : 'Image generation result was empty.';
-      console.error('Image generation failed:', reason);
-      throw new Error(`Failed to generate visual. Reason: ${reason}`);
-    }
+      },
+      prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
+    });
 
     let voiceoverMedia: string;
     let audioDuration: number;
-    if (voiceoverResult.status === 'fulfilled' && voiceoverResult.value.media.url) {
-      const audioBuffer = Buffer.from(
-        voiceoverResult.value.media.url.substring(voiceoverResult.value.media.url.indexOf(',') + 1),
+    let audioBuffer: Buffer;
+    if (voiceoverResult.media.url) {
+      audioBuffer = Buffer.from(
+        voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
         'base64'
       );
       voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
@@ -80,14 +63,43 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       const channels = 1;
       audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
     } else {
-      const reason = voiceoverResult.status === 'rejected' ? voiceoverResult.reason.message : 'Voiceover generation result was empty.';
-      console.error('Voiceover generation failed:', reason);
-      throw new Error(`Failed to generate voiceover. Reason: ${reason}`);
+      throw new Error(`Failed to generate voiceover.`);
     }
+
+    // 3. Generate Video using audio duration
+    let { operation } = await ai.generate({
+        model: 'googleai/veo-2.0-generate-001',
+        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
+        config: {
+            durationSeconds: Math.max(5, Math.min(8, Math.ceil(audioDuration))),
+            aspectRatio: '16:9',
+        },
+    });
+
+    if (!operation) {
+        throw new Error('Video generation did not return an operation.');
+    }
+
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        operation = await ai.checkOperation(operation);
+    }
+
+    if (operation.error) {
+        throw new Error('Video generation failed: ' + operation.error.message);
+    }
+
+    const videoPart = operation.output?.message?.content.find(p => !!p.media);
+    if (!videoPart || !videoPart.media?.url) {
+        throw new Error('Failed to find the generated video in operation result.');
+    }
+    
+    // The URL from Veo is temporary and needs the API key to be accessed.
+    const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     
     return {
       script: script.replace(/---/g, '\n\n'),
-      imageUrl,
+      videoUrl,
       voiceoverMedia,
       audioDuration,
     };

@@ -63,9 +63,8 @@ export default function Home() {
     return (
       <StoryResult 
         script={result.script} 
-        imageUrl={result.imageUrl} 
-        voiceoverMedia={result.voiceoverMedia} 
-        audioDuration={result.audioDuration}
+        videoUrl={result.videoUrl} 
+        voiceoverMedia={result.voiceoverMedia}
         onReset={resetApp} 
       />
     )
@@ -81,7 +80,7 @@ export default function Home() {
             height={300}
             unoptimized
         />
-        <p className="mt-4 text-lg font-mono text-center">Generating your cinematic masterpiece...</p>
+        <p className="mt-4 text-lg font-mono text-center">Reading your mind...</p>
       </main>
     );
   }

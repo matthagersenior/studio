@@ -4,17 +4,15 @@ import { AudioPlayer } from "./audio-player";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import { useEffect, useState } from "react";
-import Image from 'next/image';
 
 interface StoryResultProps {
   script: string;
-  imageUrl: string;
+  videoUrl: string;
   voiceoverMedia: string;
-  audioDuration: number;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, voiceoverMedia, audioDuration, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, voiceoverMedia, onReset }: StoryResultProps) {
   const [startPlayback, setStartPlayback] = useState(false);
 
   useEffect(() => {
@@ -24,41 +22,19 @@ export function StoryResult({ script, imageUrl, voiceoverMedia, audioDuration, o
     return () => clearTimeout(timer);
   }, []);
 
-  const animationDuration = Math.max(audioDuration, 10);
-
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
-       <style>
-        {`
-          @keyframes kenburns {
-            0% {
-              transform: scale(1.0) translate(0, 0);
-              transform-origin: center center;
-            }
-            50% {
-              transform: scale(1.15) translate(-1%, 1%);
-              transform-origin: center center;
-            }
-            100% {
-              transform: scale(1.0) translate(0, 0);
-              transform-origin: center center;
-            }
-          }
-          .animate-kenburns {
-            animation: kenburns ${animationDuration}s ease-in-out infinite;
-          }
-        `}
-      </style>
       <div className="w-full max-w-4xl h-full flex flex-col md:aspect-[16/9] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         
         <div className="relative w-full aspect-[16/9] md:h-full rounded-lg overflow-hidden shrink-0">
-          <Image
-            key={imageUrl}
-            src={imageUrl}
-            alt="Generated cinematic visual"
-            className="absolute top-0 left-0 w-full h-full object-cover animate-kenburns"
-            fill
-            unoptimized
+          <video
+            key={videoUrl}
+            className="absolute top-0 left-0 w-full h-full object-cover"
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
           />
            <div className="md:hidden absolute inset-0 bg-black/30 flex items-center justify-center">
             <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
