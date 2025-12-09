@@ -36,7 +36,7 @@ async function generateVoiceover(script: string): Promise<string> {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'vindemiatrix' },
+            prebuiltVoiceConfig: { voiceName: 'Algenib' },
           },
         },
     },
@@ -104,7 +104,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         }
 
         if (videoOperation.error) {
-            throw new Error('Video generation failed: ' + videoOperation.error.message);
+            throw videoOperation.error; // Throw the actual error to be caught below
         }
 
         const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
@@ -116,7 +116,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         return { script, audioUrl, videoUrl };
 
     } catch (e: any) {
-        const errorMessage = e.message || '';
         console.error('Video generation failed, falling back to image sequence.', e);
         
         // Always fall back to image generation on any video error
@@ -131,6 +130,9 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     
     if (errorMessage.includes('safety policies')) {
         return { error: "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt." };
+    }
+    if (errorMessage.includes('429') || errorMessage.includes('quota')) {
+        return { error: "The video generator is currently under high demand. Please try again later." };
     }
     
     return { error: errorMessage };
