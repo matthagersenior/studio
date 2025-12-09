@@ -5,16 +5,18 @@ import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import { useEffect, useState } from "react";
 import Image from 'next/image';
+import { Timer } from "lucide-react";
 
 interface StoryResultProps {
   script: string;
   visualUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
+  generationTime: number;
   onReset: () => void;
 }
 
-export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, onReset }: StoryResultProps) {
+export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, generationTime, onReset }: StoryResultProps) {
   const [startPlayback, setStartPlayback] = useState(false);
 
   useEffect(() => {
@@ -63,6 +65,12 @@ export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, 
                 ROTTEN ENOUGH
             </Button>
         </div>
+        
+        <div className="flex items-center gap-2 text-xs text-white/50 md:absolute md:bottom-4 md:left-4">
+            <Timer className="h-3 w-3" />
+            <span>Generated in {generationTime.toFixed(2)}s</span>
+        </div>
+
       </div>
     </div>
   );

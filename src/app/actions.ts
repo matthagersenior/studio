@@ -8,17 +8,21 @@ export type GenerationResult = {
   visualUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
+  generationTime: number;
   error?: never;
 } | {
   script?: never;
   visualUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
+  generationTime?: never;
   error: string;
 };
 
 
 export async function generateStory(prompt: string): Promise<GenerationResult> {
+  const startTime = Date.now();
+
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
   }
@@ -107,11 +111,15 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const channels = 1; // Mono
     const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
 
+    const endTime = Date.now();
+    const generationTime = (endTime - startTime) / 1000; // in seconds
+
     return {
       script: script.replace(/---/g, '\n\n'),
       visualUrl,
       voiceoverMedia,
       audioDuration,
+      generationTime,
     };
 
   } catch (e: any) {

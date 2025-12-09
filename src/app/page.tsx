@@ -49,7 +49,7 @@ export default function Home() {
       setIsLoading(false);
     } else {
       setResult(response);
-      // isLoading will be set to false when the component unmounts or StoryResult is shown
+      // isLoading will be set to false from within StoryResult's onReset
     }
   }
 
@@ -66,6 +66,7 @@ export default function Home() {
         visualUrl={result.visualUrl} 
         voiceoverMedia={result.voiceoverMedia} 
         audioDuration={result.audioDuration}
+        generationTime={result.generationTime}
         onReset={resetApp} 
       />
     )
