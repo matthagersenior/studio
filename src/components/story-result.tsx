@@ -4,73 +4,48 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX } from "lucide-react";
-import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
   audioUrl: string;
-  videoUrl?: string | null;
-  imageUrls?: string[] | null; 
+  videoUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, imageUrls, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const mediaRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
-  const [isMuted, setIsMuted] = useState(true); // Start muted
+  const [isMuted, setIsMuted] = useState(true);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [currentVisualIndex, setCurrentVisualIndex] = useState(0);
 
-  // Combine audio and video refs for KaraokeScript
-  useEffect(() => {
-    if (audioRef.current) {
-        (mediaRef as React.MutableRefObject<HTMLAudioElement | null>).current = audioRef.current;
-    }
-  }, []);
-  
-  // Effect to handle playing audio and video together
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-  
+    const video = videoRef.current;
+
+    if (!audio || !video) return;
+
     const playMedia = async () => {
       try {
+        // Set sources
         audio.src = audioUrl;
-        await audio.play();
+        video.src = videoUrl;
+
+        // Ensure video is muted (audio comes from the audio element)
+        video.muted = true;
+        
+        // Load and play both
+        await Promise.all([audio.play(), video.play()]);
+
       } catch (e) {
         console.error("Autoplay was prevented. User interaction needed.", e);
-        setIsMuted(true);
+        setIsMuted(true); 
       }
     };
-  
+
     playMedia();
-  
-  }, [audioUrl]);
-  
-  // Effect to sync visual sequence with audio
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !imageUrls || imageUrls.length === 0 || !audioDuration) return;
-  
-    const numVisuals = imageUrls.length;
-    const intervalDuration = audioDuration / numVisuals;
-  
-    const handleTimeUpdate = () => {
-      const newIndex = Math.min(numVisuals - 1, Math.floor(audio.currentTime / intervalDuration));
-      if (newIndex !== currentVisualIndex) {
-        setCurrentVisualIndex(newIndex);
-      }
-    };
-  
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-  
-    return () => {
-      if (audio) {
-          audio.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-    };
-  }, [imageUrls, audioDuration, currentVisualIndex]);
+
+  }, [audioUrl, videoUrl]);
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
@@ -82,7 +57,7 @@ export function StoryResult({ script, audioUrl, videoUrl, imageUrls, onReset }: 
       }
     }
   };
-
+  
   const handleAudioMetadata = () => {
     if (audioRef.current) {
       setAudioDuration(audioRef.current.duration);
@@ -100,32 +75,15 @@ export function StoryResult({ script, audioUrl, videoUrl, imageUrls, onReset }: 
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
-          {videoUrl && (
-            <video
-              key={videoUrl}
-              className="absolute top-0 left-0 w-full h-full object-cover"
-              src={videoUrl}
-              loop
-              muted // Video is always muted to sync with single audio source
-              playsInline
-              autoPlay
-            />
-          )}
-          
-          {imageUrls && imageUrls.length > 0 && (
-            <div className="w-full h-full">
-              {imageUrls.map((url, index) => (
-                <Image
-                  key={url.slice(0, 50)}
-                  src={url}
-                  alt={`Generated visual ${index + 1}`}
-                  fill
-                  className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000 ${index === currentVisualIndex ? 'opacity-100' : 'opacity-0'}`}
-                  priority={index === 0}
-                />
-              ))}
-            </div>
-          )}
+          <video
+            ref={videoRef}
+            key={videoUrl}
+            className="absolute top-0 left-0 w-full h-full object-cover"
+            loop
+            muted // Video is always muted; audio is controlled by the <audio> element
+            playsInline
+            autoPlay
+          />
         </div>
 
         <div
@@ -134,7 +92,7 @@ export function StoryResult({ script, audioUrl, videoUrl, imageUrls, onReset }: 
         >
           <KaraokeScript
             script={script}
-            mediaRef={mediaRef}
+            mediaRef={audioRef}
             mediaDuration={audioDuration}
           />
         </div>

@@ -6,8 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
-  videoUrl?: string;
-  imageUrls?: string[];
+  videoUrl: string;
   error?: never;
 };
 
@@ -52,77 +51,59 @@ async function generateVoiceover(script: string): Promise<string> {
   return `data:audio/wav;base64,${wavData}`;
 }
 
-async function generateImageSequence(script: string): Promise<string[]> {
-    const sentences = script.match(/[^.!?]+[.!?]+/g) || [script];
+async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
+    const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
+    
+    let videoOperation = (await ai.generate({
+        model: 'googleai/veo-2.0-generate-001',
+        prompt: [
+            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic and high-energy. Script: ${script}` },
+            { media: { url: imageUri } }
+        ],
+        config: {
+            durationSeconds: estimatedDuration,
+            aspectRatio: '9:16',
+        },
+    })).operation;
 
-    const imagePromises = sentences.map(sentence => (async () => {
-        const prompt = `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction for a chaotic meme based on this absurd script sentence: "${sentence}"`;
-        
-        const { media } = await ai.generate({
-            model: 'googleai/imagen-4.0-fast-generate-001',
-            prompt: prompt,
-        });
+    if (!videoOperation) {
+        throw new Error('Video generation did not return an operation.');
+    }
 
-        if (!media?.url) {
-            throw new Error(`Image generation failed for sentence: "${sentence}"`);
-        }
-        return media.url;
-    })());
+    while (!videoOperation.done) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        videoOperation = await ai.checkOperation(videoOperation);
+    }
 
-    return Promise.all(imagePromises);
+    if (videoOperation.error) {
+        console.error('Video generation failed in operation:', videoOperation.error);
+        throw new Error(`Video generation failed: ${videoOperation.error.message}`);
+    }
+
+    const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
+    if (!videoPart || !videoPart.media?.url) {
+        throw new Error('Failed to find the generated video in operation result.');
+    }
+    
+    // The URL from Veo needs the API key to be downloadable
+    return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
 }
 
 
-export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
+export async function generateStory(prompt: string, imageUri: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
+  }
+  if (!imageUri) {
+    return { error: 'An image is required.'};
   }
 
   try {
     const script = await generateScript(prompt);
     const audioUrl = await generateVoiceover(script);
+    const videoUrl = await generateVideoFromImage(script, imageUri);
     
-    try {
-        const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
-        
-        let videoOperation = (await ai.generate({
-            model: 'googleai/veo-2.0-generate-001',
-            prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
-            config: {
-                durationSeconds: estimatedDuration,
-                aspectRatio: '9:16',
-            },
-        })).operation;
-
-        if (!videoOperation) {
-            throw new Error('Video generation did not return an operation.');
-        }
-
-        while (!videoOperation.done) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            videoOperation = await ai.checkOperation(videoOperation);
-        }
-
-        if (videoOperation.error) {
-            throw videoOperation.error; // Throw the actual error to be caught below
-        }
-
-        const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
-        if (!videoPart || !videoPart.media?.url) {
-            throw new Error('Failed to find the generated video in operation result.');
-        }
-        
-        const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
-        return { script, audioUrl, videoUrl };
-
-    } catch (e: any) {
-        console.error('Video generation failed, falling back to image sequence.', e);
-        
-        // Always fall back to image generation on any video error
-        console.log("Fallback: Generating image sequence due to video generation error.");
-        const imageUrls = await generateImageSequence(script);
-        return { script, audioUrl, imageUrls };
-    }
+    return { script, audioUrl, videoUrl };
 
   } catch (e: any) {
     console.error('Story generation failed:', e);
