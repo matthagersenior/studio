@@ -42,7 +42,6 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return { error: 'Failed to generate story script.' };
     }
     
-    // First, generate the voiceover to get the audio duration
     const voiceoverPromise = ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
@@ -57,34 +56,23 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
     });
     
-    const audioBufferPromise = voiceoverPromise.then(async (voiceoverResult) => {
-      if (!voiceoverResult.media.url) {
-        throw new Error(`Failed to generate voiceover.`);
-      }
-      return Buffer.from(
-        voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
-        'base64'
-      );
-    });
-    
+    // We need to resolve the audio duration before we can start the video generation.
+    const audioBuffer = await voiceoverPromise.then(async (voiceoverResult) => {
+        if (!voiceoverResult.media.url) {
+          throw new Error('Failed to generate voiceover media.');
+        }
+        return Buffer.from(
+          voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
+          'base64'
+        );
+      });
+
     const sampleRate = 24000;
     const bitDepth = 16;
     const channels = 1;
-    const audioDurationPromise = audioBufferPromise.then(buffer => buffer.length / (sampleRate * (bitDepth / 8) * channels));
-    
-    const timestampsPromise = voiceoverPromise.then(voiceoverResult => {
-      const timepoints = voiceoverResult.output?.custom?.timepoints;
-      if (!timepoints || !Array.isArray(timepoints)) {
-        console.warn('Timestamps not found in voiceover result.');
-        return [];
-      }
-      return timepoints as WordTimestamp[];
-    });
+    const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
 
-
-    // Now, generate the video with the correct duration
     const videoGenerationPromise = (async () => {
-        const audioDuration = await audioDurationPromise;
         let { operation } = await ai.generate({
             model: 'googleai/veo-2.0-generate-001',
             prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
@@ -112,21 +100,18 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
             throw new Error('Failed to find the generated video in operation result.');
         }
         
-        // The URL from Veo is temporary and needs the API key to be accessed.
         return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     })();
 
-
-    const [videoUrl, audioBuffer, audioDuration, timestamps] = await Promise.all([
+    // Resolve all promises concurrently
+    const [videoUrl, voiceoverResult] = await Promise.all([
       videoGenerationPromise,
-      audioBufferPromise,
-      audioDurationPromise,
-      timestampsPromise,
+      voiceoverPromise, // We already used this promise, but await it again to get timestamps
     ]);
-    
+
+    const timestamps = (voiceoverResult.output?.custom?.timepoints as WordTimestamp[]) || [];
     const voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
     
-    // Clean up the script for display
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
     return {
@@ -143,6 +128,10 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     if (errorMessage.includes('429')) {
         return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
+    }
+    
+    if (errorMessage.includes('enableTimepoints')) {
+        return { error: 'Failed to get word timings for karaoke mode. Please try again.'}
     }
 
     return { error: errorMessage };
