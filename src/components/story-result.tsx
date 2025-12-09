@@ -10,11 +10,11 @@ interface StoryResultProps {
   script: string;
   audioUrl: string;
   videoUrl?: string | null;
-  videoUrls?: string[] | null; // Can be video clips or image URLs
+  imageUrls?: string[] | null; 
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, videoUrl, imageUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRef = useRef<HTMLAudioElement>(null);
   
@@ -51,9 +51,9 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
   // Effect to sync visual sequence with audio
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !videoUrls || videoUrls.length === 0 || !audioDuration) return;
+    if (!audio || !imageUrls || imageUrls.length === 0 || !audioDuration) return;
   
-    const numVisuals = videoUrls.length;
+    const numVisuals = imageUrls.length;
     const intervalDuration = audioDuration / numVisuals;
   
     const handleTimeUpdate = () => {
@@ -70,7 +70,7 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
           audio.removeEventListener('timeupdate', handleTimeUpdate);
       }
     };
-  }, [videoUrls, audioDuration, currentVisualIndex]);
+  }, [imageUrls, audioDuration, currentVisualIndex]);
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
@@ -88,8 +88,6 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
       setAudioDuration(audioRef.current.duration);
     }
   };
-
-  const isImageSequence = videoUrls && videoUrls.every(url => url.startsWith('data:image'));
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
@@ -114,27 +112,11 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
             />
           )}
           
-          {videoUrls && videoUrls.length > 0 && !isImageSequence && (
+          {imageUrls && imageUrls.length > 0 && (
             <div className="w-full h-full">
-              {videoUrls.map((url, index) => (
-                <video
-                    key={url}
-                    src={url}
-                    className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentVisualIndex ? 'opacity-100' : 'opacity-0'}`}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                />
-              ))}
-            </div>
-          )}
-
-          {isImageSequence && videoUrls && videoUrls.length > 0 && (
-            <div className="w-full h-full">
-              {videoUrls.map((url, index) => (
+              {imageUrls.map((url, index) => (
                 <Image
-                  key={url}
+                  key={url.slice(0, 50)}
                   src={url}
                   alt={`Generated visual ${index + 1}`}
                   fill
