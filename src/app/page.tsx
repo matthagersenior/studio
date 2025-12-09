@@ -23,6 +23,7 @@ export default function Home() {
   const [script, setScript] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[] | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
 
@@ -38,6 +39,7 @@ export default function Home() {
     setScript(null);
     setAudioUrl(null);
     setVideoUrl(null);
+    setImageUrls(null);
 
     const result = await generateScriptAndVoiceover(values.prompt);
     
@@ -57,22 +59,25 @@ export default function Home() {
 
   useEffect(() => {
     if (loadingState === 'generating-video' && script) {
-      const createVideo = async () => {
-        const videoResult = await generateVideo(script);
-        if (videoResult.error) {
+      const createVisuals = async () => {
+        const visualResult = await generateVideo(script); // This now handles video and image fallback
+        if (visualResult.error) {
           toast({
             variant: "destructive",
-            title: "Video Generation Failed",
-            description: videoResult.error,
+            title: "Visual Generation Failed",
+            description: visualResult.error,
           });
-          // Keep showing audio/script even if video fails
+          // Keep showing audio/script even if visuals fail
           setLoadingState('idle'); 
-        } else if (videoResult.videoUrl) {
-          setVideoUrl(videoResult.videoUrl);
+        } else if (visualResult.videoUrl) {
+          setVideoUrl(visualResult.videoUrl);
+          setLoadingState('idle');
+        } else if (visualResult.imageUrls) {
+          setImageUrls(visualResult.imageUrls);
           setLoadingState('idle');
         }
       };
-      createVideo();
+      createVisuals();
     }
   }, [loadingState, script, toast]);
 
@@ -80,6 +85,7 @@ export default function Home() {
     setScript(null);
     setAudioUrl(null);
     setVideoUrl(null);
+    setImageUrls(null);
     setLoadingState('idle');
     form.reset();
   }
@@ -89,6 +95,7 @@ export default function Home() {
       <StoryResult
         script={script}
         videoUrl={videoUrl}
+        imageUrls={imageUrls}
         audioUrl={audioUrl}
         onReset={resetApp}
         isGeneratingVideo={loadingState === 'generating-video'}

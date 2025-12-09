@@ -9,14 +9,16 @@ export type ScriptAndVoiceoverResult = {
   error?: never;
 };
 
-export type VideoResult = {
-  videoUrl: string;
+export type VisualResult = {
+  videoUrl?: string;
+  imageUrls?: string[];
   error?: never;
 }
 
 export type StoryGenerationResult = {
   script?: string;
   videoUrl?: string;
+  imageUrls?: string[];
   audioUrl?: string;
   error: string;
 };
@@ -62,8 +64,37 @@ async function generateVoiceover(script: string): Promise<{ audioUrl: string }> 
   };
 }
 
+export async function generateImages(script: string): Promise<VisualResult | StoryGenerationResult> {
+    try {
+        const sentences = script.match(/[^.!?]+[.!?]+/g) || [script];
+        const imagePrompts = sentences.map(sentence => `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction for a chaotic meme based on this absurd script sentence: "${sentence}"`);
 
-export async function generateVideo(script: string): Promise<VideoResult | StoryGenerationResult> {
+        const imagePromises = imagePrompts.map(prompt => 
+            ai.generate({
+                model: 'googleai/imagen-4.0-fast-generate-001',
+                prompt: prompt,
+            })
+        );
+        
+        const imageResults = await Promise.all(imagePromises);
+
+        const imageUrls = imageResults.map(result => {
+            if (!result.media?.url) {
+                throw new Error('An image could not be generated from a sentence.');
+            }
+            return result.media.url;
+        });
+
+        return { imageUrls };
+
+    } catch (e: any) {
+        console.error('Image generation failed:', e);
+        return { error: e.message || "Failed to generate image sequence." };
+    }
+}
+
+
+export async function generateVideo(script: string): Promise<VisualResult | StoryGenerationResult> {
   try {
     const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
 
@@ -95,13 +126,13 @@ export async function generateVideo(script: string): Promise<VideoResult | Story
         throw new Error('Failed to find the generated video in operation result.');
     }
     
-    // The key must be appended to the URL to make it accessible
     return { videoUrl: `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}` };
   } catch(e: any) {
     console.error('Video generation failed:', e);
     const errorMessage = e.message || 'An unexpected error occurred during video generation.';
-     if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-        return { error: "We're experiencing high demand for video right now. Please try again later." };
+     if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('high demand')) {
+        console.log("Video generation failed due to high demand. Falling back to image generation.");
+        return await generateImages(script);
     }
     return { error: errorMessage };
   }
