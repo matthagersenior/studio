@@ -51,12 +51,10 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
             prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
           },
         },
-        enableTimepoints: true,
       },
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
     });
     
-    // We need to resolve the audio duration before we can start the video generation.
     const audioBuffer = await voiceoverPromise.then(async (voiceoverResult) => {
         if (!voiceoverResult.media.url) {
           throw new Error('Failed to generate voiceover media.');
@@ -103,10 +101,9 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     })();
 
-    // Resolve all promises concurrently
     const [videoUrl, voiceoverResult] = await Promise.all([
       videoGenerationPromise,
-      voiceoverPromise, // We already used this promise, but await it again to get timestamps
+      voiceoverPromise,
     ]);
 
     const timestamps = (voiceoverResult.custom?.timepoints as WordTimestamp[]) || [];
