@@ -66,7 +66,6 @@ export default function Home() {
         visualUrl={result.visualUrl} 
         voiceoverMedia={result.voiceoverMedia} 
         audioDuration={result.audioDuration}
-        generationTime={result.generationTime}
         onReset={resetApp} 
       />
     )
