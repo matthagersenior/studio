@@ -109,7 +109,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       voiceoverPromise, // We already used this promise, but await it again to get timestamps
     ]);
 
-    const timestamps = (voiceoverResult.output?.custom?.timepoints as WordTimestamp[]) || [];
+    const timestamps = (voiceoverResult.custom?.timepoints as WordTimestamp[]) || [];
     const voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
     
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
@@ -128,10 +128,6 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     if (errorMessage.includes('429')) {
         return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
-    }
-    
-    if (errorMessage.includes('enableTimepoints')) {
-        return { error: 'Failed to get word timings for karaoke mode. Please try again.'}
     }
 
     return { error: errorMessage };
