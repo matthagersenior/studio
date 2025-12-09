@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb', // Default is 1mb, increase for video data
+      bodySizeLimit: '10mb',
     },
   },
 };
