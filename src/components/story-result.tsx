@@ -4,61 +4,62 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX } from "lucide-react";
+import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
   audioUrl: string;
   videoUrl?: string | null;
-  videoUrls?: string[] | null;
+  videoUrls?: string[] | null; // Can be video clips or image URLs
   onReset: () => void;
 }
 
 export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
-  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
+  const [isMuted, setIsMuted] = useState(false); // Start unmuted
   const [audioDuration, setAudioDuration] = useState(0);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [currentVisualIndex, setCurrentVisualIndex] = useState(0);
+
+  const isImageSequence = videoUrls ? videoUrls.every(url => url.startsWith('data:image')) : false;
 
   // Effect to handle playing audio and video together
   useEffect(() => {
     const audio = audioRef.current;
-    if (audio) {
-        audio.src = audioUrl;
+    const video = videoRef.current;
 
-        const playMedia = () => {
-            const audioPromise = audio.play();
-            if (audioPromise !== undefined) {
-                audioPromise.catch(e => {
-                    console.error("Audio autoplay was prevented:", e);
-                    setIsMuted(true); // If autoplay fails, stay muted
-                });
-            }
+    const playMedia = async () => {
+      try {
+        if (audio) {
+          audio.src = audioUrl;
+          await audio.play();
+        }
+        if (video) {
+          await video.play();
+        }
+      } catch (e) {
+        console.error("Autoplay was prevented. User interaction needed.", e);
+        setIsMuted(true); // Mute if autoplay fails, so user can unmute.
+      }
+    };
 
-            videoRefs.current.forEach(videoEl => {
-                if (videoEl) {
-                    videoEl.play().catch(e => console.error("Video autoplay failed", e));
-                }
-            });
-        };
+    playMedia();
 
-        playMedia();
-    }
-  }, [audioUrl, videoUrl, videoUrls]);
+  }, [audioUrl, videoUrl]);
 
-  // Effect to sync video sequence with audio
+  // Effect to sync visual sequence with audio
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !videoUrls || videoUrls.length === 0 || !audioDuration) return;
   
-    const numVideos = videoUrls.length;
-    const intervalDuration = audioDuration / numVideos;
+    const numVisuals = videoUrls.length;
+    const intervalDuration = audioDuration / numVisuals;
   
     const handleTimeUpdate = () => {
-      const newIndex = Math.min(numVideos - 1, Math.floor(audio.currentTime / intervalDuration));
-      if (newIndex !== currentVideoIndex) {
-        setCurrentVideoIndex(newIndex);
+      const newIndex = Math.min(numVisuals - 1, Math.floor(audio.currentTime / intervalDuration));
+      if (newIndex !== currentVisualIndex) {
+        setCurrentVisualIndex(newIndex);
       }
     };
   
@@ -69,7 +70,7 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
           audio.removeEventListener('timeupdate', handleTimeUpdate);
       }
     };
-  }, [videoUrls, audioDuration, currentVideoIndex]);
+  }, [videoUrls, audioDuration, currentVisualIndex]);
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
@@ -101,12 +102,12 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
           {videoUrl && (
             <video
-              ref={el => videoRefs.current[0] = el}
+              ref={videoRef}
               key={videoUrl}
               className="absolute top-0 left-0 w-full h-full object-cover"
               src={videoUrl}
               loop
-              muted // All videos are always muted to sync with single audio source
+              muted // Video is always muted to sync with single audio source
               playsInline
             />
           )}
@@ -114,14 +115,13 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
           {videoUrls && videoUrls.length > 0 && (
             <div className="w-full h-full">
               {videoUrls.map((url, index) => (
-                <video
+                <Image
                   key={url}
-                  ref={el => videoRefs.current[index] = el}
                   src={url}
-                  className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentVideoIndex ? 'opacity-100' : 'opacity-0'}`}
-                  loop
-                  muted // All videos are always muted
-                  playsInline
+                  alt={`Generated visual ${index + 1}`}
+                  fill
+                  className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000 ${index === currentVisualIndex ? 'opacity-100' : 'opacity-0'}`}
+                  priority={index === 0}
                 />
               ))}
             </div>

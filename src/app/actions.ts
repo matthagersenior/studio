@@ -55,40 +55,21 @@ async function generateVoiceover(script: string): Promise<string> {
 async function generateVideoSequence(script: string): Promise<string[]> {
     const sentences = script.match(/[^.!?]+[.!?]+/g) || [script];
 
-    const videoPromises = sentences.map(sentence => (async () => {
+    const imagePromises = sentences.map(sentence => (async () => {
         const prompt = `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction for a chaotic meme based on this absurd script sentence: "${sentence}"`;
         
-        let operation = (await ai.generate({
-            model: 'googleai/veo-2.0-generate-001',
-            prompt: prompt,
-            config: {
-                durationSeconds: 5, 
-                aspectRatio: '9:16',
-            },
-        })).operation;
+        const { media } = await ai.generate({
+            model: 'googleai/imagen-4.0-fast-generate-001',
+            prompt,
+        });
         
-        if (!operation) {
-            throw new Error(`Video sequence generation did not return an operation for sentence: "${sentence}"`);
+        if (!media?.url) {
+            throw new Error(`Image generation failed for sentence: "${sentence}"`);
         }
-
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            operation = await ai.checkOperation(operation);
-        }
-
-        if (operation.error) {
-            throw new Error(`Video sequence generation failed for sentence: "${sentence}". Error: ${operation.error.message}`);
-        }
-
-        const videoPart = operation.output?.message?.content.find(p => !!p.media);
-        if (!videoPart || !videoPart.media?.url) {
-            throw new Error(`Failed to find the generated video in operation result for sentence: "${sentence}"`);
-        }
-
-        return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+        return media.url;
     })());
 
-    return Promise.all(videoPromises);
+    return Promise.all(imagePromises);
 }
 
 
@@ -98,9 +79,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const script = await generateScript(prompt);
-    const audioUrl = await generateVoiceover(script);
+    const [script, audioUrl] = await Promise.all([
+      generateScript(prompt),
+      generateVoiceover(prompt), // Generate voiceover from the initial prompt for timing
+    ]);
     
+    // Regenerate voiceover with the final script for accuracy
+    const finalAudioUrl = await generateVoiceover(script);
+
     try {
         const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
         
@@ -132,16 +118,22 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         }
         
         const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
-        return { script, audioUrl, videoUrl };
+        return { script, audioUrl: finalAudioUrl, videoUrl };
 
     } catch (e: any) {
         const errorMessage = e.message || '';
-        console.error('Video generation failed, falling back to video sequence.', e);
+        console.error('Video generation failed, falling back to image sequence.', e);
         
-        // Universal fallback to image sequence on any video error
-        console.log("Fallback: Generating video sequence instead.");
-        const videoUrls = await generateVideoSequence(script);
-        return { script, audioUrl, videoUrls };
+        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
+            console.log("Fallback: Generating image sequence due to rate limit.");
+            const imageUrls = await generateVideoSequence(script);
+            return { script, audioUrl: finalAudioUrl, videoUrls: imageUrls };
+        }
+        
+        // For other video errors, you might still want to fallback or handle differently
+        console.log("Fallback: Generating image sequence due to other video error.");
+        const imageUrls = await generateVideoSequence(script);
+        return { script, audioUrl: finalAudioUrl, videoUrls: imageUrls };
     }
 
   } catch (e: any) {
