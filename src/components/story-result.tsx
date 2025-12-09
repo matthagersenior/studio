@@ -16,7 +16,7 @@ interface StoryResultProps {
 
 export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+  const mediaRef = useRef<HTMLAudioElement>(null);
   
   const [isMuted, setIsMuted] = useState(true); // Start muted
   const [audioDuration, setAudioDuration] = useState(0);

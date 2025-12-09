@@ -98,9 +98,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const script = await generateScript(prompt);
-    const audioUrl = await generateVoiceover(script);
+    const [script, audioUrl] = await Promise.all([
+        generateScript(prompt),
+        generateVoiceover(prompt) // Generate voiceover from the same initial prompt for speed
+    ]);
     
+    // Regenerate voiceover with final script for better sync
+    const finalAudioUrl = await generateVoiceover(script);
+
     try {
         const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
         
@@ -132,7 +137,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         }
         
         const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
-        return { script, audioUrl, videoUrl };
+        return { script, audioUrl: finalAudioUrl, videoUrl };
 
     } catch (e: any) {
         const errorMessage = e.message || '';
@@ -141,12 +146,12 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
             console.log("Fallback: Generating video sequence due to rate limit.");
             const videoUrls = await generateVideoSequence(script);
-            return { script, audioUrl, videoUrls: videoUrls };
+            return { script, audioUrl: finalAudioUrl, videoUrls: videoUrls };
         }
         
         console.log("Fallback: Generating video sequence due to other video error.");
         const videoUrls = await generateVideoSequence(script);
-        return { script, audioUrl, videoUrls: videoUrls };
+        return { script, audioUrl: finalAudioUrl, videoUrls: videoUrls };
     }
 
   } catch (e: any) {
