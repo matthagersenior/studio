@@ -8,15 +8,14 @@ import Image from 'next/image';
 
 interface StoryResultProps {
   script: string;
-  visualUrls: string[];
+  visualUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
   onReset: () => void;
 }
 
-export function StoryResult({ script, visualUrls, voiceoverMedia, audioDuration, onReset }: StoryResultProps) {
+export function StoryResult({ script, visualUrl, voiceoverMedia, audioDuration, onReset }: StoryResultProps) {
   const [startPlayback, setStartPlayback] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -25,32 +24,20 @@ export function StoryResult({ script, visualUrls, voiceoverMedia, audioDuration,
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (visualUrls.length > 1 && audioDuration > 0) {
-      const intervalDuration = (audioDuration * 1000) / visualUrls.length;
-      const interval = setInterval(() => {
-        setCurrentImageIndex(prevIndex => (prevIndex + 1) % visualUrls.length);
-      }, intervalDuration);
-
-      return () => clearInterval(interval);
-    }
-  }, [visualUrls, audioDuration]);
-
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-4xl h-full flex flex-col md:aspect-[16/9] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         
         <div className="relative w-full aspect-[16/9] md:h-full rounded-lg overflow-hidden shrink-0">
-           {visualUrls.map((url, index) => (
-            <Image
-              key={url}
-              src={url}
-              alt={`Scene ${index + 1}`}
-              fill
-              className={`object-cover transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'}`}
-              priority={index === 0}
-            />
-          ))}
+          <video
+            key={visualUrl}
+            src={`${visualUrl}&key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`}
+            className="absolute top-0 left-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
            <div className="md:hidden absolute inset-0 bg-black/30 flex items-center justify-center">
             <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
           </div>

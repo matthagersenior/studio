@@ -5,13 +5,13 @@ import { toWav } from "@/lib/wav-converter";
 
 export type GenerationResult = {
   script: string;
-  visualUrls: string[];
+  visualUrl: string; // Changed from visualUrls
   voiceoverMedia: string;
   audioDuration: number;
   error?: never;
 } | {
   script?: never;
-  visualUrls?: never;
+  visualUrl?: never; // Changed from visualUrls
   voiceoverMedia?: never;
   audioDuration?: never;
   error: string;
@@ -24,27 +24,24 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
   }
 
   try {
-    // 1. Generate Story Script with 3 scenes
+    // 1. Generate Story Script 
     const scriptResponse = await ai.generate({
-      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. CRUCIALLY, the story MUST be broken into exactly 3 distinct scenes. Use a scene separator like '---' between each scene. Each scene must have a clear visual description. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Prompt: ${prompt}`,
+      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Prompt: ${prompt}`,
     });
     const script = scriptResponse.text;
     if (!script) {
         return { error: 'Failed to generate story script.' };
     }
 
-    const scenes = script.split('---').map(s => s.trim()).filter(Boolean);
-    if (scenes.length < 1) {
-        return { error: 'Could not parse scenes from the generated script.' };
-    }
-
-    // 2. Generate Visuals and Voiceover in Parallel
-    const visualPromises = scenes.map(scene => 
-      ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd scene: ${scene}`,
-      })
-    );
+    // 2. Generate Video and Voiceover in Parallel
+    const videoPromise = ai.generate({
+        model: 'googleai/veo-2.0-generate-001',
+        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
+        config: {
+            durationSeconds: 8, // Veo can generate between 5-8s
+            aspectRatio: '16:9',
+        },
+    });
 
     const voiceoverPromise = ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
@@ -56,12 +53,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
             },
           },
         },
-        prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script.replace(/---/g, ' ')}`,
+        prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
       });
 
-    const [voiceoverResult, ...visualResults] = await Promise.allSettled([
+    const [voiceoverResult, videoOpResult] = await Promise.allSettled([
       voiceoverPromise,
-      ...visualPromises
+      videoPromise,
     ]);
 
     // 3. Process Voiceover Result
@@ -78,19 +75,32 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       console.error('Voiceover generation failed:', reason);
       return { error: `Failed to generate voiceover: ${reason}` };
     }
-    
-    // 4. Process Visual Results
-    const visualUrls = visualResults.map((result, index) => {
-        if (result.status === 'fulfilled' && result.value.media.url) {
-            return result.value.media.url;
-        } else {
-            const reason = result.status === 'rejected' ? (result.reason as Error).message : `Image generation for scene ${index + 1} was empty.`;
-            console.error(`Image generation for scene ${index + 1} failed:`, reason);
-            // We are throwing here because if one image fails, the whole experience is broken.
-            // A more robust implementation might return a placeholder or allow partial results.
-            throw new Error(reason);
+
+    // 4. Process Video Result (Polling)
+    let visualUrl: string;
+    if (videoOpResult.status === 'fulfilled' && videoOpResult.value.operation) {
+        let operation = videoOpResult.value.operation;
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before checking again
+            operation = await ai.checkOperation(operation);
         }
-    });
+
+        if (operation.error) {
+            throw new Error(`Video generation failed: ${operation.error.message}`);
+        }
+
+        const video = operation.output?.message?.content.find(p => !!p.media);
+        if (!video || !video.media?.url) {
+            throw new Error('Failed to find the generated video in operation result.');
+        }
+        visualUrl = video.media.url;
+
+    } else {
+        const reason = videoOpResult.status === 'rejected' ? (videoOpResult.reason as Error).message : 'Video generation operation did not start.';
+        console.error('Video generation failed:', reason);
+        throw new Error(reason);
+    }
+    
 
     // 5. Calculate audio duration
     const sampleRate = 24000; // As per the model's output
@@ -100,7 +110,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
 
     return {
       script: script.replace(/---/g, '\n\n'),
-      visualUrls,
+      visualUrl,
       voiceoverMedia,
       audioDuration,
     };

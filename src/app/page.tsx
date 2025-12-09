@@ -55,11 +55,11 @@ export default function Home() {
     setResult(null);
   }
 
-  if (result && !result.error) {
+  if (result && !result.error && result.visualUrl) {
     return (
       <StoryResult 
         script={result.script} 
-        visualUrls={result.visualUrls} 
+        visualUrl={result.visualUrl} 
         voiceoverMedia={result.voiceoverMedia} 
         audioDuration={result.audioDuration}
         onReset={resetApp} 
