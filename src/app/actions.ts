@@ -52,10 +52,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       prompt: cleanScript,
       config: {
         responseModalities: ['AUDIO'],
-        voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: 'vindemiatrix',
-          }
+        speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'vindemiatrix',
+              }
+            }
         }
       },
     });
