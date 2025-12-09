@@ -8,84 +8,90 @@ import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  videoUrl: string | null;
-  imageUrls: string[] | null;
   audioUrl: string;
+  videoUrl?: string | null;
+  videoUrls?: string[] | null;
   onReset: () => void;
-  isGeneratingVideo: boolean;
 }
 
-export function StoryResult({ script, videoUrl, imageUrls, audioUrl, onReset, isGeneratingVideo }: StoryResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  
   const [isMuted, setIsMuted] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 
-  // Attempt to play audio when the component mounts and url is available
+  const allMediaRefs = videoUrls ? videoRefs : (videoUrl ? { current: [videoRefs.current[0]] } : { current: [] });
+
   useEffect(() => {
     const audio = audioRef.current;
-    if (audio && audioUrl) {
+    if (audio) {
       audio.src = audioUrl;
-      audio.play().catch(e => {
-        console.error("Audio autoplay was prevented. Muting to allow user interaction.", e);
-        setIsMuted(true);
-      });
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          console.error("Audio autoplay was prevented:", e);
+          setIsMuted(true);
+        });
+      }
     }
   }, [audioUrl]);
 
-  // Sync video playback with audio
   useEffect(() => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (video && audio) {
-      const syncPlayback = () => {
-        if (!video.src) return;
-        if (audio.paused) video.pause();
-        else video.play();
-      };
-      audio.addEventListener('play', syncPlayback);
-      audio.addEventListener('pause', syncPlayback);
-
-      if (videoUrl) {
-        syncPlayback();
+    if (!audio || !videoUrls || videoUrls.length === 0 || !audioDuration) return;
+  
+    const numVideos = videoUrls.length;
+    const intervalDuration = audioDuration / numVideos;
+  
+    const handleTimeUpdate = () => {
+      const newIndex = Math.min(numVideos - 1, Math.floor(audio.currentTime / intervalDuration));
+      if (newIndex !== currentVideoIndex) {
+        setCurrentVideoIndex(newIndex);
       }
-
-      return () => {
-        audio.removeEventListener('play', syncPlayback);
-        audio.removeEventListener('pause', syncPlayback);
-      };
-    }
-  }, [videoUrl]);
-
-  // Handle image sequence display
-  useEffect(() => {
-    if (!imageUrls || imageUrls.length === 0 || !audioDuration) return;
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const intervalDuration = (audioDuration / imageUrls.length) * 1000;
-    const interval = setInterval(() => {
-      setCurrentImageIndex(prevIndex => (prevIndex + 1) % imageUrls.length);
-    }, intervalDuration);
-
-    const handleAudioEnd = () => setCurrentImageIndex(0);
-    audio.addEventListener('ended', handleAudioEnd);
-
-    return () => {
-      clearInterval(interval);
-      audio.removeEventListener('ended', handleAudioEnd);
     };
-  }, [imageUrls, audioDuration]);
+  
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+  
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [videoUrls, audioDuration, currentVideoIndex]);
+
+  useEffect(() => {
+    const allVideos = videoRefs.current.filter(Boolean) as HTMLVideoElement[];
+    const audio = audioRef.current;
+
+    if (allVideos.length > 0 && audio) {
+        const syncPlayback = () => {
+            allVideos.forEach(video => {
+                if (audio.paused) video.pause();
+                else video.play().catch(e => console.error("Video play failed", e));
+            });
+        };
+
+        audio.addEventListener('play', syncPlayback);
+        audio.addEventListener('pause', syncPlayback);
+
+        // Initial sync
+        syncPlayback();
+
+        return () => {
+            audio.removeEventListener('play', syncPlayback);
+            audio.removeEventListener('pause', syncPlayback);
+        };
+    }
+}, [videoUrl, videoUrls, audioDuration]);
+
 
   const handleMuteToggle = () => {
-    const audio = audioRef.current;
-    if (audio) {
-      const newMutedState = !isMuted;
-      audio.muted = newMutedState;
-      setIsMuted(newMutedState);
-      if (!newMutedState && audio.paused) {
-        audio.play().catch(e => console.error("Could not play audio on unmute.", e));
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    if (audioRef.current) {
+      audioRef.current.muted = newMutedState;
+      if (!newMutedState && audioRef.current.paused) {
+        audioRef.current.play().catch(e => console.error("Could not play audio on unmute.", e));
       }
     }
   };
@@ -108,19 +114,11 @@ export function StoryResult({ script, videoUrl, imageUrls, audioUrl, onReset, is
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
-          {(isGeneratingVideo) && (
-            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-white text-center p-4">
-              <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
-              <p className="mt-4 text-lg font-mono">Generating visuals...</p>
-              <p className="mt-2 text-sm text-gray-400">Video is in high demand, we may generate images instead.</p>
-            </div>
-          )}
-
           {videoUrl && (
             <video
-              ref={videoRef}
+              ref={el => videoRefs.current[0] = el}
               key={videoUrl}
-              className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000 ${isGeneratingVideo ? 'opacity-0' : 'opacity-100'}`}
+              className="absolute top-0 left-0 w-full h-full object-cover"
               src={videoUrl}
               autoPlay
               loop
@@ -129,16 +127,18 @@ export function StoryResult({ script, videoUrl, imageUrls, audioUrl, onReset, is
             />
           )}
           
-          {imageUrls && imageUrls.length > 0 && (
+          {videoUrls && videoUrls.length > 0 && (
             <div className="w-full h-full">
-              {imageUrls.map((url, index) => (
-                <Image
-                  key={index}
+              {videoUrls.map((url, index) => (
+                <video
+                  key={url}
+                  ref={el => videoRefs.current[index] = el}
                   src={url}
-                  alt={`Generated image ${index + 1}`}
-                  fill
-                  className={`object-cover transition-opacity duration-1000 ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'}`}
-                  unoptimized
+                  className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentVideoIndex ? 'opacity-100' : 'opacity-0'}`}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
                 />
               ))}
             </div>

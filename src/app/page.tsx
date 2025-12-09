@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,21 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { generateScriptAndVoiceover, generateVideo } from "@/app/actions";
+import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
 import Image from 'next/image';
+import type { StoryResultPayload } from "@/app/actions";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'generating-script' | 'generating-video';
+type LoadingState = 'idle' | 'generating';
 
 export default function Home() {
-  const [script, setScript] = useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [imageUrls, setImageUrls] = useState<string[] | null>(null);
+  const [generationResult, setGenerationResult] = useState<StoryResultPayload | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
 
@@ -35,13 +33,10 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('generating-script');
-    setScript(null);
-    setAudioUrl(null);
-    setVideoUrl(null);
-    setImageUrls(null);
+    setLoadingState('generating');
+    setGenerationResult(null);
 
-    const result = await generateScriptAndVoiceover(values.prompt);
+    const result = await generateStory(values.prompt);
     
     if (result.error) {
       toast({
@@ -51,59 +46,30 @@ export default function Home() {
       });
       setLoadingState('idle');
     } else {
-      setScript(result.script);
-      setAudioUrl(result.audioUrl);
-      setLoadingState('generating-video');
+      setGenerationResult(result);
+      setLoadingState('idle');
     }
   }
 
-  useEffect(() => {
-    if (loadingState === 'generating-video' && script) {
-      const createVisuals = async () => {
-        const visualResult = await generateVideo(script); // This now handles video and image fallback
-        if (visualResult.error) {
-          toast({
-            variant: "destructive",
-            title: "Visual Generation Failed",
-            description: visualResult.error,
-          });
-          // Keep showing audio/script even if visuals fail
-          setLoadingState('idle'); 
-        } else if (visualResult.videoUrl) {
-          setVideoUrl(visualResult.videoUrl);
-          setLoadingState('idle');
-        } else if (visualResult.imageUrls) {
-          setImageUrls(visualResult.imageUrls);
-          setLoadingState('idle');
-        }
-      };
-      createVisuals();
-    }
-  }, [loadingState, script, toast]);
-
   function resetApp() {
-    setScript(null);
-    setAudioUrl(null);
-    setVideoUrl(null);
-    setImageUrls(null);
+    setGenerationResult(null);
     setLoadingState('idle');
     form.reset();
   }
   
-  if (script && audioUrl) {
+  if (generationResult) {
     return (
       <StoryResult
-        script={script}
-        videoUrl={videoUrl}
-        imageUrls={imageUrls}
-        audioUrl={audioUrl}
+        script={generationResult.script}
+        audioUrl={generationResult.audioUrl}
+        videoUrl={generationResult.videoUrl}
+        videoUrls={generationResult.videoUrls}
         onReset={resetApp}
-        isGeneratingVideo={loadingState === 'generating-video'}
       />
     );
   }
   
-  if (loadingState === 'generating-script') {
+  if (loadingState === 'generating') {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         <Image 
@@ -114,6 +80,7 @@ export default function Home() {
             unoptimized
         />
         <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
+        <p className="mt-2 text-sm text-gray-400 font-mono text-center">This can take up to a minute...</p>
       </main>
     );
   }
