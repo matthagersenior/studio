@@ -86,13 +86,16 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         } else {
             const reason = result.status === 'rejected' ? (result.reason as Error).message : `Image generation for scene ${index + 1} was empty.`;
             console.error(`Image generation for scene ${index + 1} failed:`, reason);
+            // We are throwing here because if one image fails, the whole experience is broken.
+            // A more robust implementation might return a placeholder or allow partial results.
             throw new Error(reason);
         }
     });
 
-    const sampleRate = 24000;
-    const bitDepth = 16;
-    const channels = 1;
+    // 5. Calculate audio duration
+    const sampleRate = 24000; // As per the model's output
+    const bitDepth = 16; // PCM16
+    const channels = 1; // Mono
     const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
 
     return {
