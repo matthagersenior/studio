@@ -25,34 +25,50 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
 
     if (!audio || !video) return;
 
+    // Set sources
+    audio.src = audioUrl;
+    video.src = videoUrl;
+
     const playMedia = async () => {
       try {
-        // Set sources
-        audio.src = audioUrl;
-        video.src = videoUrl;
-
         // Ensure video is muted (audio comes from the audio element)
         video.muted = true;
-        
+        // Start muted to comply with autoplay policies
+        audio.muted = isMuted;
+
         // Load and play both
         await Promise.all([audio.play(), video.play()]);
-
       } catch (e) {
         console.error("Autoplay was prevented. User interaction needed.", e);
+        // If autoplay fails, ensure we are in a muted state
         setIsMuted(true); 
       }
     };
 
     playMedia();
 
-  }, [audioUrl, videoUrl]);
+    // Sync video playback with audio
+    const syncVideo = () => {
+      if (video && audio) {
+        video.currentTime = audio.currentTime;
+      }
+    };
+    audio.addEventListener('play', syncVideo);
+
+    return () => {
+      audio.removeEventListener('play', syncVideo);
+    }
+
+  }, [audioUrl, videoUrl, isMuted]); // Rerun effect if isMuted changes to attempt playing audio
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
     if (audioRef.current) {
       audioRef.current.muted = newMutedState;
+      // If unmuting and audio is paused, try to play it
       if (!newMutedState && audioRef.current.paused) {
+        videoRef.current?.play().catch(e => console.error("Could not play video on unmute.", e));
         audioRef.current.play().catch(e => console.error("Could not play audio on unmute.", e));
       }
     }
@@ -68,10 +84,11 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <audio
         ref={audioRef}
+        src={audioUrl}
         loop
+        playsInline
         muted={isMuted}
         onLoadedMetadata={handleAudioMetadata}
-        playsInline
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
