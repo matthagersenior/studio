@@ -81,7 +81,7 @@ export default function Home() {
             height={300}
             unoptimized
         />
-        <p className="mt-4 text-lg font-mono">Reading your mind...</p>
+        <p className="mt-4 text-lg font-mono text-center">Reading your mind...<br/>This can take up to a minute.</p>
       </main>
     );
   }
