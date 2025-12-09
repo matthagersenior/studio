@@ -83,7 +83,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const audioUrl = await generateVoiceover(script);
     
     try {
-        const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
+        const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
         
         let videoOperation = (await ai.generate({
             model: 'googleai/veo-2.0-generate-001',
