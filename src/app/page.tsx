@@ -103,7 +103,7 @@ export default function Home() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                      Quit being so pushy...
+                      Reading your mind...
                     </>
                   ) : (
                     "ROT IT!"

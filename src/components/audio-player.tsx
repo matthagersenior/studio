@@ -17,8 +17,12 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onEnded = () => setIsPlaying(false);
-    audio.addEventListener("ended", onEnded);
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+
 
     if (autoPlay) {
       audio.play().catch(e => {
@@ -29,7 +33,8 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
     }
 
     return () => {
-      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
     };
   }, [src, autoPlay]);
   
@@ -46,10 +51,6 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
     if (isPlaying) {
       audio.pause();
     } else {
-      // If we are at the end, rewind before playing.
-      if (audio.currentTime >= audio.duration) {
-          audio.currentTime = 0;
-      }
       audio.play().catch(e => console.error("Audio play failed", e));
     }
     setIsPlaying(!isPlaying);
@@ -59,7 +60,7 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
     if (audioRef.current) {
         audioRef.current.currentTime = 0;
         if (!isPlaying) {
-          togglePlayPause(); // Will start playing from the beginning
+          audioRef.current.play().catch(e => console.error("Audio play failed", e));
         }
     }
   };
@@ -69,7 +70,7 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
       className="bg-transparent text-white p-3 rounded-lg w-full flex items-center justify-center gap-2"
       style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
     >
-      <audio ref={audioRef} src={src} preload="auto" />
+      <audio ref={audioRef} src={src} preload="auto" loop />
       <Button onClick={togglePlayPause} variant="ghost" size="icon" className="hover:bg-white/10 rounded-full h-12 w-12">
         {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8 fill-current" />}
       </Button>
