@@ -116,6 +116,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
 
   } catch (e: any) {
     console.error('Story generation failed:', e);
-    return { error: e.message || 'An unexpected error occurred during generation. Please try again later.' };
+    const errorMessage = e.message || 'An unexpected error occurred during generation.';
+    
+    if (errorMessage.includes('429')) {
+        return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
+    }
+
+    return { error: errorMessage };
   }
 }
