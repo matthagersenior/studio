@@ -4,6 +4,7 @@ import Image from "next/image";
 import { AudioPlayer } from "./audio-player";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
+import { useEffect, useState } from "react";
 
 interface StoryResultProps {
   script: string;
@@ -13,6 +14,17 @@ interface StoryResultProps {
 }
 
 export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: StoryResultProps) {
+  const [startPlayback, setStartPlayback] = useState(false);
+
+  // Use useEffect to trigger autoplay after a user gesture (the button click that led here).
+  // A small delay ensures the component is mounted and ready.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setStartPlayback(true);
+    }, 100); // 100ms delay
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       {/* 
@@ -31,6 +43,10 @@ export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: 
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 70vw"
           />
+           {/* Mobile-only audio player */}
+          <div className="md:hidden absolute inset-0 bg-black/30 flex items-center justify-center">
+            <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
+          </div>
         </div>
 
         {/* Script Text */}
@@ -46,9 +62,9 @@ export function StoryResult({ script, visualDataUri, voiceoverMedia, onReset }: 
           </ScrollArea>
         </div>
 
-        {/* Audio Player */}
-        <div className="w-full mt-auto md:absolute md:top-4 md:left-4 md:right-4 md:mt-0 md:w-auto">
-            <AudioPlayer src={voiceoverMedia} />
+        {/* Audio Player for Desktop */}
+        <div className="w-full mt-auto hidden md:flex md:absolute md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:mt-0 md:w-auto">
+            <AudioPlayer src={voiceoverMedia} autoPlay={startPlayback} />
         </div>
 
         {/* Reset Button */}
