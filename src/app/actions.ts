@@ -6,14 +6,15 @@ import { toWav } from "@/lib/wav-converter";
 export type StoryGenerationResult = {
   script: string;
   videoUrl: string;
-  duration: number;
+  audioUrl: string;
   error?: never;
 } | {
   script?: never;
   videoUrl?: never;
-  duration?: never;
+  audioUrl?: never;
   error: string;
 };
+
 
 async function generateScript(prompt: string): Promise<string> {
   const scriptResponse = await ai.generate({
@@ -27,6 +28,32 @@ async function generateScript(prompt: string): Promise<string> {
 
   // Clean the script for display
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
+}
+
+async function generateVoiceover(script: string): Promise<{ audioUrl: string }> {
+  const voiceoverResult = await ai.generate({
+    model: 'googleai/gemini-2.5-flash-preview-tts',
+    prompt: script,
+    config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'vindemiatrix' },
+          },
+        },
+    },
+  });
+
+  if (!voiceoverResult.media?.url) {
+    throw new Error('The voiceover could not be generated.');
+  }
+  
+  const pcmData = Buffer.from(voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1), 'base64');
+  const wavData = await toWav(pcmData);
+  
+  return {
+    audioUrl: `data:audio/wav;base64,${wavData}`,
+  };
 }
 
 
@@ -71,15 +98,17 @@ export async function generateStory(prompt: string): Promise<StoryGenerationResu
   try {
     const script = await generateScript(prompt);
 
-    // Fixed duration for video
-    const videoDuration = 8;
-    
-    const videoUrl = await generateVideo(script, videoDuration);
+    const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
+
+    const [videoResult, voiceoverResult] = await Promise.all([
+        generateVideo(script, estimatedDuration),
+        generateVoiceover(script)
+    ]);
 
     return {
       script,
-      videoUrl,
-      duration: videoDuration,
+      videoUrl: videoResult,
+      audioUrl: voiceoverResult.audioUrl,
     };
   } catch (e: any) {
     console.error('Story generation failed:', e);

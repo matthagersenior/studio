@@ -48,7 +48,7 @@ export default function Home() {
       setLoadingState('idle');
     } else {
       setStoryResult(result);
-      setLoadingState('idle'); // Or transition to a 'showingResult' state
+      setLoadingState('idle');
     }
   }
 
@@ -64,7 +64,7 @@ export default function Home() {
       <StoryResult
         script={storyResult.script}
         videoUrl={storyResult.videoUrl}
-        duration={storyResult.duration}
+        audioUrl={storyResult.audioUrl}
         onReset={resetApp}
       />
     );
