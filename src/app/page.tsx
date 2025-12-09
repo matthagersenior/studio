@@ -6,8 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { generateStory } from "@/app/actions";
@@ -17,7 +16,6 @@ import type { StoryResultPayload } from "@/app/actions";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
-  image: z.any().refine(file => file instanceof File, "An image is required."),
 });
 
 type LoadingState = 'idle' | 'generating';
@@ -38,31 +36,17 @@ export default function Home() {
     setLoadingState('generating');
     setGenerationResult(null);
 
-    const reader = new FileReader();
-    reader.readAsDataURL(values.image);
-    reader.onload = async (e) => {
-      const imageDataUri = e.target?.result as string;
-
-      const result = await generateStory(values.prompt, imageDataUri);
-      
-      if (result.error) {
-        toast({
-          variant: "destructive",
-          title: "Generation Failed",
-          description: result.error,
-        });
-        setLoadingState('idle');
-      } else {
-        setGenerationResult(result);
-        setLoadingState('idle');
-      }
-    };
-    reader.onerror = (e) => {
-       toast({
+    const result = await generateStory(values.prompt);
+    
+    if (result.error) {
+      toast({
         variant: "destructive",
-        title: "Image Reading Failed",
-        description: "Could not read the selected image file.",
+        title: "Generation Failed",
+        description: result.error,
       });
+      setLoadingState('idle');
+    } else {
+      setGenerationResult(result);
       setLoadingState('idle');
     }
   }
@@ -115,7 +99,7 @@ export default function Home() {
         <Card className="bg-white/80 backdrop-blur-sm border-gray-200/30 shadow-2xl">
           <CardHeader>
             <CardTitle className="text-gray-800">Create Your Story</CardTitle>
-            <CardDescription className="text-gray-600">Enter a prompt, upload an image, and let AI bring it to life.</CardDescription>
+            <CardDescription className="text-gray-600">Enter a prompt and let AI bring it to life.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -135,32 +119,6 @@ export default function Home() {
                           disabled={loadingState !== 'idle'}
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="image"
-                  render={({ field: { onChange, value, ...rest }}) => (
-                    <FormItem>
-                      <FormLabel>Starting Image</FormLabel>
-                      <FormControl>
-                         <Input 
-                            type="file" 
-                            accept="image/*"
-                            className="bg-white/50"
-                            onChange={(e) => {
-                                if (e.target.files) {
-                                    onChange(e.target.files[0]);
-                                }
-                            }}
-                            disabled={loadingState !== 'idle'}
-                         />
-                      </FormControl>
-                       <FormDescription>
-                        The image that will be animated.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

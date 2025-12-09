@@ -51,6 +51,19 @@ async function generateVoiceover(script: string): Promise<string> {
   return `data:audio/wav;base64,${wavData}`;
 }
 
+async function generateInitialImage(prompt: string): Promise<string> {
+    const imageResponse = await ai.generate({
+      model: 'googleai/imagen-4.0-fast-generate-001',
+      prompt: `Create a cinematic, surreal, and meme-worthy image based on this prompt: ${prompt}. The style should be dramatic, high-energy, and slightly absurd. Use a 9:16 aspect ratio.`,
+    });
+
+    if (!imageResponse.media?.url) {
+        throw new Error('Failed to generate the initial image.');
+    }
+    return imageResponse.media.url;
+}
+
+
 async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
     const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
     
@@ -90,18 +103,19 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
 }
 
 
-export async function generateStory(prompt: string, imageUri: string): Promise<StoryResultPayload | StoryGenerationError> {
+export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
-  }
-  if (!imageUri) {
-    return { error: 'An image is required.'};
   }
 
   try {
     const script = await generateScript(prompt);
-    const audioUrl = await generateVoiceover(script);
-    const videoUrl = await generateVideoFromImage(script, imageUri);
+    const [audioUrl, initialImage] = await Promise.all([
+        generateVoiceover(script),
+        generateInitialImage(prompt)
+    ]);
+    
+    const videoUrl = await generateVideoFromImage(script, initialImage);
     
     return { script, audioUrl, videoUrl };
 
@@ -113,7 +127,10 @@ export async function generateStory(prompt: string, imageUri: string): Promise<S
         return { error: "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt." };
     }
     if (errorMessage.includes('429') || errorMessage.includes('quota')) {
-        return { error: "The video generator is currently under high demand. Please try again later." };
+        return { error: "The generator is currently under high demand. Please try again later." };
+    }
+     if (errorMessage.includes('durationSeconds')) {
+        return { error: "There was an issue with the video generation parameters. Please try again." };
     }
     
     return { error: errorMessage };
