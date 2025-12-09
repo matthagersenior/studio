@@ -97,6 +97,10 @@
           "type": "string",
           "description": "Timestamp indicating when the user account was created.",
           "format": "date-time"
+        },
+        "generationCount": {
+          "type": "number",
+          "description": "The number of stories this user has generated."
         }
       },
       "required": [

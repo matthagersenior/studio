@@ -3,9 +3,9 @@
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
 import { auth } from "@/firebase";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { firestore } from "@/firebase";
+import { Firestore, increment } from "firebase/firestore";
 
 export type GenerationResult = {
   script: string;
@@ -21,6 +21,33 @@ export type GenerationResult = {
   error: string;
 };
 
+const GENERATION_LIMIT = 10;
+
+async function checkAndIncrementCount(db: Firestore, userId: string): Promise<boolean> {
+  const userDocRef = doc(db, 'users', userId);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const userDoc = await transaction.get(userDocRef);
+      if (!userDoc.exists()) {
+        throw "User document does not exist.";
+      }
+      const currentCount = userDoc.data().generationCount || 0;
+      if (currentCount >= GENERATION_LIMIT) {
+        throw `You have reached your limit of ${GENERATION_LIMIT} free generations.`;
+      }
+      transaction.update(userDocRef, { generationCount: increment(1) });
+    });
+    return true; // Transaction successful
+  } catch (e: any) {
+    if (typeof e === 'string' && e.includes('limit')) {
+       throw new Error(e);
+    }
+    console.error("Transaction failed: ", e);
+    throw new Error("Could not update generation count.");
+  }
+}
+
+
 export async function generateAndSaveStory(prompt: string): Promise<GenerationResult> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -31,6 +58,9 @@ export async function generateAndSaveStory(prompt: string): Promise<GenerationRe
     if (!user) {
       return { error: 'You must be logged in to create a story.' };
     }
+
+    // Check and increment generation count
+    await checkAndIncrementCount(firestore, user.uid);
 
     // 1. Generate Story Script 
     const scriptResponse = await ai.generate({
@@ -115,9 +145,9 @@ export async function generateAndSaveStory(prompt: string): Promise<GenerationRe
     const channels = 1; // Mono
     const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
 
-    // 6. Save to Firestore (non-blocking)
+    // 6. Save to Firestore
     const contentCollectionRef = collection(firestore, 'users', user.uid, 'generatedContent');
-    addDocumentNonBlocking(contentCollectionRef, {
+    await addDoc(contentCollectionRef, {
         prompt: prompt,
         storyScript: script.replace(/---/g, '\n\n'),
         visualUrl,

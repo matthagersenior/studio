@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { auth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { FirebaseError } from 'firebase/app';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '@/firebase';
 
 const formSchema = z.object({
@@ -50,7 +50,8 @@ export default function SignUpPage() {
       // Create a user document in Firestore
       await setDoc(doc(firestore, "users", user.uid), {
         email: user.email,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
+        generationCount: 0,
       });
       
       toast({
