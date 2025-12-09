@@ -33,8 +33,8 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     if (!script) {
         return { error: 'Failed to generate story script.' };
     }
-
-    // 2. Generate Voiceover first to get duration
+    
+    // First, generate the voiceover to get the audio duration
     const voiceoverResult = await ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
@@ -48,25 +48,22 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
     });
 
-    let voiceoverMedia: string;
-    let audioDuration: number;
-    let audioBuffer: Buffer;
-    if (voiceoverResult.media.url) {
-      audioBuffer = Buffer.from(
-        voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
-        'base64'
-      );
-      voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
-      
-      const sampleRate = 24000;
-      const bitDepth = 16;
-      const channels = 1;
-      audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
-    } else {
+    if (!voiceoverResult.media.url) {
       throw new Error(`Failed to generate voiceover.`);
     }
 
-    // 3. Generate Video using audio duration
+    const audioBuffer = Buffer.from(
+      voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1),
+      'base64'
+    );
+    const voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+    
+    const sampleRate = 24000;
+    const bitDepth = 16;
+    const channels = 1;
+    const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
+    
+    // Now, generate the video with the correct duration
     let { operation } = await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
