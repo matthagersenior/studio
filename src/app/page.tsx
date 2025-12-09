@@ -66,7 +66,6 @@ export default function Home() {
         imageUrl={result.imageUrl} 
         voiceoverMedia={result.voiceoverMedia} 
         audioDuration={result.audioDuration}
-        generationTime={result.generationTime}
         onReset={resetApp} 
       />
     )
@@ -89,7 +88,7 @@ export default function Home() {
 
 
   return (
-    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
+    <main className="min-h-screen w-full flex items-center justify-center p-4 sm-p-8 bg-black">
       <div className="max-w-4xl mx-auto space-y-8 w-full">
         <header className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">

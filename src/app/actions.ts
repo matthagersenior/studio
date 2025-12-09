@@ -8,20 +8,17 @@ export type GenerationResult = {
   imageUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
-  generationTime: number;
   error?: never;
 } | {
   script?: never;
   imageUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
-  generationTime?: never;
   error: string;
 };
 
 
 export async function generateStory(prompt: string): Promise<GenerationResult> {
-  const startTime = Date.now();
 
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -88,15 +85,11 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       throw new Error(`Failed to generate voiceover. Reason: ${reason}`);
     }
     
-    const endTime = Date.now();
-    const generationTime = (endTime - startTime) / 1000;
-
     return {
       script: script.replace(/---/g, '\n\n'),
       imageUrl,
       voiceoverMedia,
       audioDuration,
-      generationTime,
     };
 
   } catch (e: any) {
