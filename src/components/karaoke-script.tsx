@@ -5,40 +5,42 @@ import { ScrollArea } from './ui/scroll-area';
 
 interface KaraokeScriptProps {
   script: string;
-  audioDuration: number;
-  audioRef: RefObject<HTMLMediaElement>;
+  videoDuration: number;
+  videoRef: RefObject<HTMLVideoElement>;
 }
 
-export function KaraokeScript({ script, audioDuration, audioRef }: KaraokeScriptProps) {
+export function KaraokeScript({ script, videoDuration, videoRef }: KaraokeScriptProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
   const words = useMemo(() => script.split(/\s+/), [script]);
   const timestamps = useMemo(() => {
     const totalWords = words.length;
-    if (totalWords === 0 || audioDuration === 0) return [];
+    if (totalWords === 0 || videoDuration === 0) return [];
 
-    const durationPerWord = audioDuration / totalWords;
+    // Simulate timestamps by dividing the total duration by the number of words.
+    const durationPerWord = videoDuration / totalWords;
     return words.map((word, index) => {
       const startTime = index * durationPerWord;
       const endTime = startTime + durationPerWord;
       return { word, startTime, endTime };
     });
-  }, [words, audioDuration]);
+  }, [words, videoDuration]);
 
   useEffect(() => {
-    const media = audioRef.current;
-    if (!media) return;
+    const video = videoRef.current;
+    if (!video) return;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(media.currentTime);
+      // Loop the currentTime for the caption effect
+      setCurrentTime(video.currentTime % videoDuration);
     };
 
-    media.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      media.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [audioRef]);
+  }, [videoRef, videoDuration]);
 
   if (!timestamps || timestamps.length === 0) {
     return <div className="p-2 md:p-0 whitespace-pre-wrap">{script}</div>;
@@ -48,14 +50,13 @@ export function KaraokeScript({ script, audioDuration, audioRef }: KaraokeScript
     <ScrollArea className="h-full md:h-auto">
       <div className="p-2 md:p-0 whitespace-pre-wrap">
         {timestamps.map((word, index) => {
-          const isSpoken = currentTime >= word.endTime;
           const isSpeaking = currentTime >= word.startTime && currentTime < word.endTime;
           
           return (
             <span
               key={index}
               className={`transition-colors duration-200 ${
-                isSpeaking ? 'text-yellow-300' : isSpoken ? 'text-white/90' : 'text-white/50'
+                isSpeaking ? 'text-yellow-300 scale-105 inline-block' : 'text-white/80'
               }`}
             >
               {word.word}{' '}

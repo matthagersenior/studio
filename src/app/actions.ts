@@ -1,7 +1,6 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
-import { toWav } from "@/lib/wav-converter";
 
 export type TimedWord = {
   word: string;
@@ -12,15 +11,11 @@ export type TimedWord = {
 export type GenerationResult = {
   script: string;
   videoUrl: string;
-  voiceoverUrl: string;
-  timestamps: TimedWord[]; // This will be simulated
   estimatedDuration: number;
   error?: never;
 } | {
   script?: never;
   videoUrl?: never;
-  voiceoverUrl?: never;
-  timestamps?: never;
   estimatedDuration?: never;
   error: string;
 };
@@ -43,40 +38,14 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return { error: 'Failed to generate story script.' };
     }
     
-    // Clean the script for TTS and display
+    // Clean the script for display
     const cleanScript = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
-
-    // 2. Generate Voiceover
-    const voiceoverResult = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      prompt: cleanScript,
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: 'vindemiatrix',
-              }
-            }
-        }
-      },
-    });
     
-    if (!voiceoverResult.media?.url) {
-      throw new Error('Failed to generate voiceover.');
-    }
-    
-    const pcmAudioBuffer = Buffer.from(voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1), 'base64');
-    const voiceoverUrl = 'data:audio/wav;base64,' + await toWav(pcmAudioBuffer);
-    
-    // Estimate duration based on script length (words per minute)
-    const words = cleanScript.split(/\s+/);
-    // VEO model requires duration between 5 and 8 seconds.
-    const calculatedDuration = Math.ceil(words.length / (150 / 60)); // 150 WPM
-    const estimatedDuration = Math.max(5, Math.min(8, calculatedDuration));
+    // VEO model requires duration between 5 and 8 seconds. We'll use a fixed duration.
+    const estimatedDuration = 8;
 
 
-    // 3. Generate Video with the estimated duration
+    // 2. Generate Video with the fixed duration
     let videoOperation = (await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${cleanScript}`,
@@ -90,7 +59,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         throw new Error('Video generation did not return an operation.');
     }
 
-    // 4. Poll for video completion
+    // 3. Poll for video completion
     let finalOperation = videoOperation;
     while (!finalOperation.done) {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -108,19 +77,9 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     
-    // 5. Create simulated timestamps for karaoke effect - will be refined on client
-    const timestamps: TimedWord[] = words.map((word, index) => {
-        const durationPerWord = estimatedDuration / words.length;
-        const startTime = index * durationPerWord;
-        const endTime = startTime + durationPerWord;
-        return { word, startTime, endTime };
-    });
-
     return {
       script: cleanScript,
       videoUrl,
-      voiceoverUrl,
-      timestamps, // Send simulated timestamps
       estimatedDuration,
     };
 
@@ -134,11 +93,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     if (errorMessage.includes('violate Gemini API')) {
         return { error: "The prompt could not be submitted. This prompt contains words that violate Gemini API's usage guidelines. Try rephrasing the prompt. If you think this was an error, send feedback." };
     }
-    if (errorMessage.includes('Failed to generate voiceover')) {
-       return { error: "The voiceover could not be generated. Please try a different prompt." };
-    }
-
-
+    
     return { error: errorMessage };
   }
 }

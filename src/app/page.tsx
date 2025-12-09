@@ -64,7 +64,7 @@ export default function Home() {
       <StoryResult
         script={result.script}
         videoUrl={result.videoUrl}
-        voiceoverUrl={result.voiceoverUrl}
+        duration={result.estimatedDuration}
         onReset={resetApp}
       />
     );
