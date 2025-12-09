@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
-import { RetroLoader } from "@/components/retro-loader";
+import Image from 'next/image';
 
 
 import type { GenerationResult } from "@/app/actions";
@@ -73,8 +73,15 @@ export default function Home() {
   
   if (isLoading) {
     return (
-      <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
-        <RetroLoader />
+      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
+        <Image 
+            src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
+            alt="Now Loading..."
+            width={300}
+            height={300}
+            unoptimized
+        />
+        <p className="mt-4 text-lg font-mono">Engaging Brainrot...</p>
       </main>
     );
   }
