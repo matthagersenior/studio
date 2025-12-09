@@ -16,38 +16,38 @@ interface StoryResultProps {
 
 export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
   
-  const [isMuted, setIsMuted] = useState(false); // Start unmuted
+  const [isMuted, setIsMuted] = useState(true); // Start muted
   const [audioDuration, setAudioDuration] = useState(0);
   const [currentVisualIndex, setCurrentVisualIndex] = useState(0);
 
-  const isImageSequence = videoUrls ? videoUrls.every(url => url.startsWith('data:image')) : false;
-
+  // Combine audio and video refs for KaraokeScript
+  useEffect(() => {
+    if (audioRef.current) {
+        (mediaRef as React.MutableRefObject<HTMLAudioElement | null>).current = audioRef.current;
+    }
+  }, []);
+  
   // Effect to handle playing audio and video together
   useEffect(() => {
     const audio = audioRef.current;
-    const video = videoRef.current;
-
+    if (!audio) return;
+  
     const playMedia = async () => {
       try {
-        if (audio) {
-          audio.src = audioUrl;
-          await audio.play();
-        }
-        if (video) {
-          await video.play();
-        }
+        audio.src = audioUrl;
+        await audio.play();
       } catch (e) {
         console.error("Autoplay was prevented. User interaction needed.", e);
-        setIsMuted(true); // Mute if autoplay fails, so user can unmute.
+        setIsMuted(true);
       }
     };
-
+  
     playMedia();
-
-  }, [audioUrl, videoUrl]);
-
+  
+  }, [audioUrl]);
+  
   // Effect to sync visual sequence with audio
   useEffect(() => {
     const audio = audioRef.current;
@@ -89,6 +89,8 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
     }
   };
 
+  const isImageSequence = videoUrls && videoUrls.every(url => url.startsWith('data:image'));
+
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <audio
@@ -102,17 +104,33 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
           {videoUrl && (
             <video
-              ref={videoRef}
               key={videoUrl}
               className="absolute top-0 left-0 w-full h-full object-cover"
               src={videoUrl}
               loop
               muted // Video is always muted to sync with single audio source
               playsInline
+              autoPlay
             />
           )}
           
-          {videoUrls && videoUrls.length > 0 && (
+          {videoUrls && videoUrls.length > 0 && !isImageSequence && (
+            <div className="w-full h-full">
+              {videoUrls.map((url, index) => (
+                <video
+                    key={url}
+                    src={url}
+                    className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentVisualIndex ? 'opacity-100' : 'opacity-0'}`}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                />
+              ))}
+            </div>
+          )}
+
+          {isImageSequence && videoUrls && videoUrls.length > 0 && (
             <div className="w-full h-full">
               {videoUrls.map((url, index) => (
                 <Image
@@ -134,7 +152,7 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
         >
           <KaraokeScript
             script={script}
-            mediaRef={audioRef}
+            mediaRef={mediaRef}
             mediaDuration={audioDuration}
           />
         </div>

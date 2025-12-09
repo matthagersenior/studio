@@ -5,7 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 
 interface KaraokeScriptProps {
   script: string;
-  mediaRef: RefObject<HTMLVideoElement | HTMLAudioElement>;
+  mediaRef: RefObject<HTMLAudioElement>;
   mediaDuration: number;
 }
 
