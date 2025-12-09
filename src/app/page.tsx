@@ -63,6 +63,7 @@ export default function Home() {
         script={generationResult.script}
         audioUrl={generationResult.audioUrl}
         videoUrl={generationResult.videoUrl}
+        videoUrls={generationResult.videoUrls}
         onReset={resetApp}
       />
     );

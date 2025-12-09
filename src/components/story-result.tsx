@@ -8,67 +8,73 @@ import { Volume2, VolumeX } from "lucide-react";
 interface StoryResultProps {
   script: string;
   audioUrl: string;
-  videoUrl: string;
+  videoUrl?: string;
+  videoUrls?: string[];
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   
   const [isMuted, setIsMuted] = useState(true);
   const [audioDuration, setAudioDuration] = useState(0);
 
+  const allVideos = videoUrl ? [videoUrl] : videoUrls || [];
+
   useEffect(() => {
     const audio = audioRef.current;
-    const video = videoRef.current;
+    if (!audio) return;
 
-    if (!audio || !video) return;
-
-    // Set sources
     audio.src = audioUrl;
-    video.src = videoUrl;
+    audio.muted = isMuted;
 
     const playMedia = async () => {
       try {
-        // Ensure video is muted (audio comes from the audio element)
-        video.muted = true;
-        // Start muted to comply with autoplay policies
-        audio.muted = isMuted;
-
-        // Load and play both
-        await Promise.all([audio.play(), video.play()]);
+        await audio.play();
+        if (videoRef.current) {
+          videoRef.current.play();
+        }
       } catch (e) {
         console.error("Autoplay was prevented. User interaction needed.", e);
-        // If autoplay fails, ensure we are in a muted state
         setIsMuted(true); 
       }
     };
-
     playMedia();
 
-    // Sync video playback with audio
-    const syncVideo = () => {
-      if (video && audio) {
-        video.currentTime = audio.currentTime;
+    const handleTimeUpdate = () => {
+      if (!allVideos || allVideos.length <= 1 || !audioDuration) return;
+
+      const progress = audio.currentTime / audioDuration;
+      const newIndex = Math.floor(progress * allVideos.length);
+      
+      if (newIndex !== currentVideoIndex) {
+        setCurrentVideoIndex(newIndex);
       }
     };
-    audio.addEventListener('play', syncVideo);
 
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    
     return () => {
-      audio.removeEventListener('play', syncVideo);
-    }
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
 
-  }, [audioUrl, videoUrl, isMuted]); // Rerun effect if isMuted changes to attempt playing audio
+  }, [audioUrl, isMuted, allVideos, audioDuration, currentVideoIndex]);
+
+  useEffect(() => {
+    if (videoRef.current && allVideos[currentVideoIndex]) {
+      videoRef.current.src = allVideos[currentVideoIndex];
+      videoRef.current.play().catch(e => console.error("Could not play video clip.", e));
+    }
+  }, [currentVideoIndex, allVideos]);
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
     if (audioRef.current) {
       audioRef.current.muted = newMutedState;
-      // If unmuting and audio is paused, try to play it
       if (!newMutedState && audioRef.current.paused) {
-        videoRef.current?.play().catch(e => console.error("Could not play video on unmute.", e));
         audioRef.current.play().catch(e => console.error("Could not play audio on unmute.", e));
       }
     }
@@ -80,12 +86,14 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
     }
   };
 
+  const isLooping = allVideos.length === 1;
+
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <audio
         ref={audioRef}
         src={audioUrl}
-        loop
+        loop={isLooping}
         playsInline
         muted={isMuted}
         onLoadedMetadata={handleAudioMetadata}
@@ -94,10 +102,10 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
           <video
             ref={videoRef}
-            key={videoUrl}
+            key={allVideos[currentVideoIndex]}
             className="absolute top-0 left-0 w-full h-full object-cover"
-            loop
-            muted // Video is always muted; audio is controlled by the <audio> element
+            loop={isLooping}
+            muted
             playsInline
             autoPlay
           />

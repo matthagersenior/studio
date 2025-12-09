@@ -6,7 +6,8 @@ import { toWav } from "@/lib/wav-converter";
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
-  videoUrl: string;
+  videoUrl?: string; // Optional: for the single video case
+  videoUrls?: string[]; // Optional: for the video sequence case
   error?: never;
 };
 
@@ -65,7 +66,6 @@ async function generateInitialImage(prompt: string): Promise<string> {
 
 
 async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
-    // Clamp the duration to be between 5 and 8 seconds, as required by the model.
     const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
     
     let videoOperation = (await ai.generate({
@@ -84,9 +84,8 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         throw new Error('Video generation did not return an operation.');
     }
 
-    // Wait for the long-running operation to complete
     while (!videoOperation.done) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Check every 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000)); 
         videoOperation = await ai.checkOperation(videoOperation);
     }
 
@@ -100,8 +99,46 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         throw new Error('Failed to find the generated video in the operation result.');
     }
     
-    // The URL from Veo needs the API key to be downloadable by the client
     return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+}
+
+async function generateVideoSequence(script: string): Promise<string[]> {
+    console.log("Fallback: Generating video sequence.");
+    const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const videoClipPromises = sentences.map(async (sentence) => {
+        let videoOperation = (await ai.generate({
+            model: 'googleai/veo-2.0-generate-001',
+            prompt: `Create a short, surreal, and chaotic video clip for the following line: "${sentence}"`,
+            config: {
+                durationSeconds: 5, // A valid, fixed duration for each clip
+                aspectRatio: '9:16',
+            },
+        })).operation;
+
+        if (!videoOperation) {
+            throw new Error('Video sequence generation did not return an operation.');
+        }
+
+        while (!videoOperation.done) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            videoOperation = await ai.checkOperation(videoOperation);
+        }
+
+        if (videoOperation.error) {
+            console.error(`Video clip generation failed for sentence: "${sentence}"`, videoOperation.error);
+            // In a real app, you might want a placeholder or retry, but here we'll throw
+            throw new Error(`Failed to generate a video clip: ${videoOperation.error.message}`);
+        }
+
+        const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
+        if (!videoPart || !videoPart.media?.url) {
+            throw new Error('Failed to find the generated video clip.');
+        }
+        
+        return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+    });
+
+    return Promise.all(videoClipPromises);
 }
 
 
@@ -111,25 +148,28 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Generate script and initial image in parallel
-    const [script, initialImage] = await Promise.all([
-        generateScript(prompt),
-        generateInitialImage(prompt)
-    ]);
+    const script = await generateScript(prompt);
+    const audioUrl = await generateVoiceover(script);
     
-    // Generate voiceover and video in parallel
-    const [audioUrl, videoUrl] = await Promise.all([
-        generateVoiceover(script),
-        generateVideoFromImage(script, initialImage)
-    ]);
-    
-    return { script, audioUrl, videoUrl };
+    try {
+      const initialImage = await generateInitialImage(prompt);
+      const videoUrl = await generateVideoFromImage(script, initialImage);
+      return { script, audioUrl, videoUrl };
+    } catch (videoError: any) {
+        const errorMessage = videoError.message || '';
+        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota') || errorMessage.includes('high demand')) {
+            console.warn("Primary video generation failed due to rate limits. Attempting fallback to video sequence.");
+            const videoUrls = await generateVideoSequence(script);
+            return { script, audioUrl, videoUrls };
+        }
+        // If it's a different error, re-throw to be caught by the outer block
+        throw videoError;
+    }
 
   } catch (e: any) {
     console.error('Story generation failed:', e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
     
-    // Provide user-friendly error messages for common issues
     if (errorMessage.includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
