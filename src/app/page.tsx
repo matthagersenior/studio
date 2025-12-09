@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
-import { Loader2 } from "lucide-react";
+import { RetroLoader } from "@/components/retro-loader";
 
 
 import type { GenerationResult } from "@/app/actions";
@@ -46,15 +46,17 @@ export default function Home() {
         title: "Generation Failed",
         description: response.error,
       });
+      setIsLoading(false);
     } else {
       setResult(response);
+      // isLoading will be set to false when the component unmounts or StoryResult is shown
     }
-    
-    setIsLoading(false);
   }
 
   function resetApp() {
     setResult(null);
+    setIsLoading(false);
+    form.reset();
   }
   
   if (result && !result.error) {
@@ -68,6 +70,15 @@ export default function Home() {
       />
     )
   }
+  
+  if (isLoading) {
+    return (
+      <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
+        <RetroLoader />
+      </main>
+    );
+  }
+
 
   return (
     <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
@@ -95,6 +106,7 @@ export default function Home() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="sr-only">Your Prompt</FormLabel>
+
                       <FormControl>
                         <Textarea
                           placeholder="e.g., A jellyfish riding a bicycle in Paris"
@@ -108,14 +120,7 @@ export default function Home() {
                   )}
                 />
                 <Button type="submit" disabled={isLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                      Reading your mind...
-                    </>
-                  ) : (
-                    "ROT IT!"
-                  )}
+                   ROT IT!
                 </Button>
               </form>
             </Form>
