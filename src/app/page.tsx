@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,20 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { generateStory } from "@/app/actions";
+import { generateScriptAndVoiceover, generateVideo } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
 import Image from 'next/image';
-
-import type { StoryGenerationResult } from "@/app/actions";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'generating';
+type LoadingState = 'idle' | 'generating-script' | 'generating-video';
 
 export default function Home() {
-  const [storyResult, setStoryResult] = useState<StoryGenerationResult | null>(null);
+  const [script, setScript] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
 
@@ -34,10 +34,12 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('generating');
-    setStoryResult(null);
+    setLoadingState('generating-script');
+    setScript(null);
+    setAudioUrl(null);
+    setVideoUrl(null);
 
-    const result = await generateStory(values.prompt);
+    const result = await generateScriptAndVoiceover(values.prompt);
     
     if (result.error) {
       toast({
@@ -47,30 +49,54 @@ export default function Home() {
       });
       setLoadingState('idle');
     } else {
-      setStoryResult(result);
-      setLoadingState('idle');
+      setScript(result.script);
+      setAudioUrl(result.audioUrl);
+      setLoadingState('generating-video');
     }
   }
 
+  useEffect(() => {
+    if (loadingState === 'generating-video' && script) {
+      const createVideo = async () => {
+        const videoResult = await generateVideo(script);
+        if (videoResult.error) {
+          toast({
+            variant: "destructive",
+            title: "Video Generation Failed",
+            description: videoResult.error,
+          });
+          // Keep showing audio/script even if video fails
+          setLoadingState('idle'); 
+        } else {
+          setVideoUrl(videoResult.videoUrl);
+          setLoadingState('idle');
+        }
+      };
+      createVideo();
+    }
+  }, [loadingState, script, toast]);
 
   function resetApp() {
-    setStoryResult(null);
+    setScript(null);
+    setAudioUrl(null);
+    setVideoUrl(null);
     setLoadingState('idle');
     form.reset();
   }
   
-  if (storyResult && !storyResult.error) {
+  if (script && audioUrl) {
     return (
       <StoryResult
-        script={storyResult.script}
-        videoUrl={storyResult.videoUrl}
-        audioUrl={storyResult.audioUrl}
+        script={script}
+        videoUrl={videoUrl}
+        audioUrl={audioUrl}
         onReset={resetApp}
+        isGeneratingVideo={loadingState === 'generating-video'}
       />
     );
   }
   
-  if (loadingState === 'generating') {
+  if (loadingState === 'generating-script') {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         <Image 

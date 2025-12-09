@@ -7,46 +7,41 @@ import { Volume2, VolumeX } from "lucide-react";
 
 interface StoryResultProps {
   script: string;
-  videoUrl: string;
+  videoUrl: string | null;
   audioUrl: string;
   onReset: () => void;
+  isGeneratingVideo: boolean;
 }
 
-export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset, isGeneratingVideo }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [audioDuration, setAudioDuration] = useState(0);
 
   useEffect(() => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-
-    if (video && audio) {
-        const playMedia = () => {
-            // Muted is necessary for video autoplay in most browsers
-            video.muted = true;
-            video.play().catch(e => console.error("Video autoplay failed", e));
-            
-            // Unmute the audio element and play it
-            audio.muted = false;
-            audio.play().catch(e => {
-                console.error("Audio autoplay failed, trying again on interaction", e);
-                // Fallback for browsers that block audio autoplay
-                setIsMuted(true);
-                video.muted = true;
-            });
-        };
-        
-        playMedia();
+    if (audio) {
+        audio.play().catch(e => {
+            console.error("Audio autoplay failed, user interaction needed", e);
+            setIsMuted(true);
+        });
     }
-  }, [videoUrl, audioUrl]);
+  }, [audioUrl]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if(video && videoUrl) {
+      video.play().catch(e => console.error("Video autoplay after load failed", e));
+    }
+  }, [videoUrl]);
   
   const handleMuteToggle = () => {
       const audio = audioRef.current;
       if (audio) {
-          audio.muted = !audio.muted;
-          setIsMuted(audio.muted);
+          const newMutedState = !audio.muted;
+          audio.muted = newMutedState;
+          setIsMuted(newMutedState);
       }
   }
 
@@ -68,12 +63,18 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         
-        <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0">
+        <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
+          {!videoUrl && (
+            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-white text-center p-4">
+               <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
+               <p className="mt-4 text-lg font-mono">Generating video...</p>
+            </div>
+          )}
           <video
             ref={videoRef}
             key={videoUrl}
-            className="absolute top-0 left-0 w-full h-full object-cover"
-            src={videoUrl}
+            className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${videoUrl ? 'opacity-100' : 'opacity-0'}`}
+            src={videoUrl || ''}
             autoPlay
             loop
             muted

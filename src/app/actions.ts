@@ -3,15 +3,21 @@
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
 
-export type StoryGenerationResult = {
+export type ScriptAndVoiceoverResult = {
   script: string;
-  videoUrl: string;
   audioUrl: string;
   error?: never;
-} | {
-  script?: never;
-  videoUrl?: never;
-  audioUrl?: never;
+};
+
+export type VideoResult = {
+  videoUrl: string;
+  error?: never;
+}
+
+export type StoryGenerationResult = {
+  script?: string;
+  videoUrl?: string;
+  audioUrl?: string;
   error: string;
 };
 
@@ -57,12 +63,15 @@ async function generateVoiceover(script: string): Promise<{ audioUrl: string }> 
 }
 
 
-async function generateVideo(script: string, duration: number): Promise<string> {
+export async function generateVideo(script: string): Promise<VideoResult | StoryGenerationResult> {
+  try {
+    const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
+
     let videoOperation = (await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
         config: {
-            durationSeconds: duration,
+            durationSeconds: estimatedDuration,
             aspectRatio: '9:16',
         },
     })).operation;
@@ -86,28 +95,28 @@ async function generateVideo(script: string, duration: number): Promise<string> 
         throw new Error('Failed to find the generated video in operation result.');
     }
     
-    return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+    return { videoUrl: `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}` };
+  } catch(e: any) {
+    console.error('Video generation failed:', e);
+    const errorMessage = e.message || 'An unexpected error occurred during video generation.';
+     if (errorMessage.includes('429')) {
+        return { error: "We're experiencing high demand for video right now. Please try again later." };
+    }
+    return { error: errorMessage };
+  }
 }
 
-
-export async function generateStory(prompt: string): Promise<StoryGenerationResult> {
+export async function generateScriptAndVoiceover(prompt: string): Promise<ScriptAndVoiceoverResult | StoryGenerationResult> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
   }
 
   try {
     const script = await generateScript(prompt);
-
-    const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
-
-    const [videoResult, voiceoverResult] = await Promise.all([
-        generateVideo(script, estimatedDuration),
-        generateVoiceover(script)
-    ]);
+    const voiceoverResult = await generateVoiceover(script);
 
     return {
       script,
-      videoUrl: videoResult,
       audioUrl: voiceoverResult.audioUrl,
     };
   } catch (e: any) {
