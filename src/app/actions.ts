@@ -2,18 +2,38 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import { MediaPart } from 'genkit';
 
 export type GenerationResult = {
   script: string;
-  visualDataUri: string;
+  visualUrl: string;
   voiceoverMedia: string;
   error?: never;
 } | {
   script?: never;
-  visualDataUri?: never;
+  visualUrl?: never;
   voiceoverMedia?: never;
   error: string;
 };
+
+
+async function downloadVideo(video: MediaPart): Promise<string> {
+    const fetch = (await import('node-fetch')).default;
+    // Add API key before fetching the video.
+    const videoDownloadResponse = await fetch(
+      `${video.media!.url}&key=${process.env.GEMINI_API_KEY}`
+    );
+    if (
+      !videoDownloadResponse ||
+      videoDownloadResponse.status !== 200 ||
+      !videoDownloadResponse.body
+    ) {
+      throw new Error('Failed to fetch video');
+    }
+    
+    const buffer = await videoDownloadResponse.buffer();
+    return `data:video/mp4;base64,${buffer.toString('base64')}`;
+}
 
 
 export async function generateStory(prompt: string): Promise<GenerationResult> {
@@ -33,11 +53,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
 
     // 2. Generate Visual and Voiceover in Parallel
     const [visualResult, voiceoverResult] = await Promise.allSettled([
-      // Generate Cinematic Visual
+      // Generate Cinematic Video
       ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
+        model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd scene: ${script}`,
         config: {
+          durationSeconds: 5,
           aspectRatio: "16:9",
         }
       }),
@@ -57,12 +78,25 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     ]);
 
     // 3. Process Visual Result
-    let visualDataUri: string;
-    if (visualResult.status === 'fulfilled' && visualResult.value.media.url) {
-      visualDataUri = visualResult.value.media.url;
+    let visualUrl: string;
+    if (visualResult.status === 'fulfilled' && visualResult.value.operation) {
+        let operation = visualResult.value.operation;
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            operation = await ai.checkOperation(operation);
+        }
+        if (operation.error) {
+            throw new Error('Video generation operation failed: ' + operation.error.message);
+        }
+        const video = operation.output?.message?.content.find((p: any) => !!p.media);
+        if (!video) {
+            throw new Error('Failed to find the generated video in operation output.');
+        }
+        visualUrl = await downloadVideo(video);
+
     } else {
-      const reason = visualResult.status === 'rejected' ? visualResult.reason.message : 'Visual generation result was empty.';
-      console.error('Visual generation failed:', reason);
+      const reason = visualResult.status === 'rejected' ? visualResult.reason.message : 'Video generation result was empty.';
+      console.error('Video generation failed:', reason);
       return { error: `Failed to generate cinematic visual: ${reason}` };
     }
 
@@ -82,7 +116,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     return {
       script,
-      visualDataUri,
+      visualUrl,
       voiceoverMedia,
     };
 
