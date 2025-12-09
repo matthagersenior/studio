@@ -51,8 +51,8 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       model: 'googleai/gemini-2.5-flash-preview-tts',
       prompt: cleanScript,
       config: {
-        responseModalities: ['AUDIO'],
         speechConfig: {
+            responseModalities: ['AUDIO'],
             voiceConfig: {
               prebuiltVoiceConfig: {
                 voiceName: 'vindemiatrix',
