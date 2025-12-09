@@ -45,10 +45,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const voiceoverPromise = ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
-        responseModalities: ['AUDIO'],
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
-        },
+        speechConfig: {
+            responseModalities: ['AUDIO'],
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
+            },
+        }
       },
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
     });
@@ -121,9 +123,6 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     if (errorMessage.includes('429')) {
         return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
-    }
-    if (errorMessage.includes("The requested combination of response modalities")) {
-      return { error: "There was an issue configuring the voice generation model. Please try again."};
     }
 
     return { error: errorMessage };
