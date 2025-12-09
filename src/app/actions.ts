@@ -2,33 +2,31 @@
 
 import { ai } from "@/ai/genkit";
 
-export type TimedWord = {
-  word: string;
-  startTime: number;
-  endTime: number;
+export type ScriptGenerationResult = {
+  script: string;
+  error?: never;
+} | {
+  script?: never;
+  error: string;
 };
 
-export type GenerationResult = {
-  script: string;
+export type VideoGenerationResult = {
   videoUrl: string;
   estimatedDuration: number;
   error?: never;
 } | {
-  script?: never;
   videoUrl?: never;
   estimatedDuration?: never;
   error: string;
 };
 
 
-export async function generateStory(prompt: string): Promise<GenerationResult> {
-
+export async function generateScript(prompt: string): Promise<ScriptGenerationResult> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
   }
 
   try {
-    // 1. Generate Story Script 
     const scriptResponse = await ai.generate({
       prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Prompt: ${prompt}`,
     });
@@ -41,14 +39,30 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     // Clean the script for display
     const cleanScript = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
     
-    // VEO model requires duration between 5 and 8 seconds. We'll use a fixed duration.
+    return { script: cleanScript };
+
+  } catch (e: any) {
+    console.error('Script generation failed:', e);
+    const errorMessage = e.message || 'An unexpected error occurred during script generation.';
+    
+    if (errorMessage.includes('429')) {
+        return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
+    }
+    if (errorMessage.includes('violate Gemini API')) {
+        return { error: "The prompt could not be submitted. This prompt contains words that violate Gemini API's usage guidelines. Try rephrasing the prompt. If you think this was an error, send feedback." };
+    }
+    
+    return { error: errorMessage };
+  }
+}
+
+export async function generateVideo(script: string): Promise<VideoGenerationResult> {
+  try {
     const estimatedDuration = 8;
 
-
-    // 2. Generate Video with the fixed duration
     let videoOperation = (await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
-        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${cleanScript}`,
+        prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
         config: {
             durationSeconds: estimatedDuration,
             aspectRatio: '9:16',
@@ -59,7 +73,6 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         throw new Error('Video generation did not return an operation.');
     }
 
-    // 3. Poll for video completion
     let finalOperation = videoOperation;
     while (!finalOperation.done) {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -78,22 +91,13 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     
     return {
-      script: cleanScript,
       videoUrl,
       estimatedDuration,
     };
 
   } catch (e: any) {
-    console.error('Story generation failed:', e);
-    const errorMessage = e.message || 'An unexpected error occurred during generation.';
-    
-    if (errorMessage.includes('429')) {
-        return { error: "We're experiencing high demand right now. Please wait a moment and try again." };
-    }
-    if (errorMessage.includes('violate Gemini API')) {
-        return { error: "The prompt could not be submitted. This prompt contains words that violate Gemini API's usage guidelines. Try rephrasing the prompt. If you think this was an error, send feedback." };
-    }
-    
+    console.error('Video generation failed:', e);
+    const errorMessage = e.message || 'An unexpected error occurred during video generation.';
     return { error: errorMessage };
   }
 }
