@@ -3,17 +3,25 @@
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
 
+export type WordTimestamp = {
+  word: string;
+  startSeconds: number;
+  endSeconds: number;
+};
+
 export type GenerationResult = {
   script: string;
   videoUrl: string;
   voiceoverMedia: string;
   audioDuration: number;
+  timestamps: WordTimestamp[];
   error?: never;
 } | {
   script?: never;
   videoUrl?: never;
   voiceoverMedia?: never;
   audioDuration?: never;
+  timestamps?: never;
   error: string;
 };
 
@@ -38,11 +46,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const voiceoverPromise = ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
-        responseModalities: ['AUDIO'],
+        responseModalities: ['AUDIO', 'TEXT'],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
           },
+          enableTimepoints: true,
         },
       },
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
@@ -62,6 +71,15 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const bitDepth = 16;
     const channels = 1;
     const audioDurationPromise = audioBufferPromise.then(buffer => buffer.length / (sampleRate * (bitDepth / 8) * channels));
+    
+    const timestampsPromise = voiceoverPromise.then(voiceoverResult => {
+      const timepoints = voiceoverResult.output?.custom?.timepoints;
+      if (!timepoints || !Array.isArray(timepoints)) {
+        console.warn('Timestamps not found in voiceover result.');
+        return [];
+      }
+      return timepoints as WordTimestamp[];
+    });
 
 
     // Now, generate the video with the correct duration
@@ -99,10 +117,11 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     })();
 
 
-    const [videoUrl, audioBuffer, audioDuration] = await Promise.all([
+    const [videoUrl, audioBuffer, audioDuration, timestamps] = await Promise.all([
       videoGenerationPromise,
       audioBufferPromise,
       audioDurationPromise,
+      timestampsPromise,
     ]);
     
     const voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
@@ -115,6 +134,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       videoUrl,
       voiceoverMedia,
       audioDuration,
+      timestamps
     };
 
   } catch (e: any) {

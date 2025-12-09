@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef } from "react";
 import { Button } from "./ui/button";
 import { Play, Pause, Rewind } from "lucide-react";
 
 interface AudioPlayerProps {
   src: string;
   autoPlay?: boolean;
+  onTimeUpdate?: (time: number) => void;
 }
 
-export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+export const AudioPlayer = forwardRef<HTMLAudioElement, AudioPlayerProps>(({ src, autoPlay = false }, ref) => {
+  const internalAudioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = (ref || internalAudioRef) as React.RefObject<HTMLAudioElement>;
   const [isPlaying, setIsPlaying] = useState(autoPlay);
 
   useEffect(() => {
@@ -19,14 +21,12 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
-
+    
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
 
-
     if (autoPlay) {
       audio.play().catch(e => {
-        // Autoplay was prevented.
         console.error("Audio autoplay failed.", e);
         setIsPlaying(false);
       });
@@ -36,13 +36,13 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
     };
-  }, [src, autoPlay]);
+  }, [src, autoPlay, audioRef]);
   
   useEffect(() => {
     if (audioRef.current) {
         setIsPlaying(autoPlay);
     }
-  }, [autoPlay]);
+  }, [autoPlay, audioRef]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -79,4 +79,6 @@ export function AudioPlayer({ src, autoPlay = false }: AudioPlayerProps) {
       </Button>
     </div>
   );
-}
+});
+
+AudioPlayer.displayName = 'AudioPlayer';
