@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,21 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { generateScript, generateVideo } from "@/app/actions";
+import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
 import Image from 'next/image';
 
-import type { VideoGenerationResult } from "@/app/actions";
+import type { StoryGenerationResult } from "@/app/actions";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'script' | 'video';
+type LoadingState = 'idle' | 'generating';
 
 export default function Home() {
-  const [videoResult, setVideoResult] = useState<VideoGenerationResult | null>(null);
-  const [script, setScript] = useState<string | null>(null);
+  const [storyResult, setStoryResult] = useState<StoryGenerationResult | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
 
@@ -35,64 +34,43 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('script');
-    setScript(null);
-    setVideoResult(null);
+    setLoadingState('generating');
+    setStoryResult(null);
 
-    const scriptResponse = await generateScript(values.prompt);
+    const result = await generateStory(values.prompt);
     
-    if (scriptResponse.error) {
+    if (result.error) {
       toast({
         variant: "destructive",
         title: "Generation Failed",
-        description: scriptResponse.error,
+        description: result.error,
       });
       setLoadingState('idle');
     } else {
-      setScript(scriptResponse.script);
-      setLoadingState('video');
+      setStoryResult(result);
+      setLoadingState('idle'); // Or transition to a 'showingResult' state
     }
   }
 
-  useEffect(() => {
-    if (loadingState === 'video' && script) {
-      const createVideo = async () => {
-        const videoResponse = await generateVideo(script);
-        if (videoResponse.error) {
-          toast({
-            variant: "destructive",
-            title: "Video Generation Failed",
-            description: videoResponse.error,
-          });
-          // Reset to idle but keep script so user doesn't lose it
-          setLoadingState('idle');
-        } else {
-          setVideoResult(videoResponse);
-        }
-      };
-      createVideo();
-    }
-  }, [loadingState, script, toast]);
 
   function resetApp() {
-    setVideoResult(null);
-    setScript(null);
+    setStoryResult(null);
     setLoadingState('idle');
     form.reset();
   }
   
-  if (videoResult && !videoResult.error && script) {
+  if (storyResult && !storyResult.error) {
     return (
       <StoryResult
-        script={script}
-        videoUrl={videoResult.videoUrl}
-        duration={videoResult.estimatedDuration}
+        script={storyResult.script}
+        videoUrl={storyResult.videoUrl}
+        duration={storyResult.duration}
         onReset={resetApp}
       />
     );
   }
   
-  if (loadingState === 'script') {
+  if (loadingState === 'generating') {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         <Image 
@@ -102,21 +80,7 @@ export default function Home() {
             height={300}
             unoptimized
         />
-        <p className="mt-4 text-lg font-mono text-center">Reading your mind...</p>
-      </main>
-    );
-  }
-
-  if (loadingState === 'video' && script) {
-    return (
-      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
-        <div className="max-w-prose text-center space-y-6">
-            <p className="text-2xl font-headline">&quot;{script}&quot;</p>
-            <div className="flex items-center justify-center space-x-3">
-                <div className="w-8 h-8 border-4 border-dashed rounded-full animate-spin border-yellow-400"></div>
-                <p className="text-lg font-mono">Generating video...</p>
-            </div>
-        </div>
+        <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
       </main>
     );
   }
