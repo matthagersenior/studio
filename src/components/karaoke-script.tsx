@@ -2,18 +2,31 @@
 
 import { useState, useEffect, useMemo, RefObject } from 'react';
 import { ScrollArea } from './ui/scroll-area';
-import type { TimedWord } from '@/app/actions';
 
 interface KaraokeScriptProps {
-  timestamps: TimedWord[];
-  videoRef: RefObject<HTMLMediaElement>;
+  script: string;
+  audioDuration: number;
+  audioRef: RefObject<HTMLMediaElement>;
 }
 
-export function KaraokeScript({ timestamps, videoRef }: KaraokeScriptProps) {
+export function KaraokeScript({ script, audioDuration, audioRef }: KaraokeScriptProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
+  const words = useMemo(() => script.split(/\s+/), [script]);
+  const timestamps = useMemo(() => {
+    const totalWords = words.length;
+    if (totalWords === 0 || audioDuration === 0) return [];
+
+    const durationPerWord = audioDuration / totalWords;
+    return words.map((word, index) => {
+      const startTime = index * durationPerWord;
+      const endTime = startTime + durationPerWord;
+      return { word, startTime, endTime };
+    });
+  }, [words, audioDuration]);
+
   useEffect(() => {
-    const media = videoRef.current;
+    const media = audioRef.current;
     if (!media) return;
 
     const handleTimeUpdate = () => {
@@ -25,10 +38,10 @@ export function KaraokeScript({ timestamps, videoRef }: KaraokeScriptProps) {
     return () => {
       media.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [videoRef]);
+  }, [audioRef]);
 
   if (!timestamps || timestamps.length === 0) {
-    return null;
+    return <div className="p-2 md:p-0 whitespace-pre-wrap">{script}</div>;
   }
 
   return (

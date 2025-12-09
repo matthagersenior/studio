@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "./ui/button";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import type { TimedWord } from "@/app/actions";
 
@@ -10,13 +10,13 @@ interface StoryResultProps {
   script: string;
   videoUrl: string;
   voiceoverUrl: string;
-  timestamps: TimedWord[];
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, voiceoverUrl, timestamps, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, voiceoverUrl, onReset }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [actualAudioDuration, setActualAudioDuration] = useState<number | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -29,12 +29,23 @@ export function StoryResult({ script, videoUrl, voiceoverUrl, timestamps, onRese
         const playPromise = video.play();
         const audioPromise = audio.play();
 
+        const handleAudioMetadata = () => {
+          if (audio) {
+            setActualAudioDuration(audio.duration);
+          }
+        };
+        audio.addEventListener('loadedmetadata', handleAudioMetadata);
+
         Promise.all([playPromise, audioPromise]).catch(e => {
           // One of the playbacks failed, likely due to browser restrictions.
           // We can unmute the video and rely on user interaction to start audio.
           if(video) video.muted = false;
           console.error("Media autoplay failed", e)
         });
+
+        return () => {
+          audio.removeEventListener('loadedmetadata', handleAudioMetadata);
+        }
     }
   }, [videoUrl, voiceoverUrl]);
 
@@ -66,10 +77,13 @@ export function StoryResult({ script, videoUrl, voiceoverUrl, timestamps, onRese
           className="w-full text-center text-white font-semibold text-lg p-4 flex-grow min-h-0 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-8 md:bg-gradient-to-t md:from-black/80 md:to-transparent md:flex-grow-0 md:min-h-0"
           style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
         >
+          {actualAudioDuration && (
             <KaraokeScript 
-              timestamps={timestamps}
-              videoRef={videoRef} // karaoke syncs to video time now
+              script={script}
+              audioDuration={actualAudioDuration}
+              audioRef={audioRef}
             />
+          )}
         </div>
 
         <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0">

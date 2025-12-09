@@ -65,7 +65,6 @@ export default function Home() {
         script={result.script}
         videoUrl={result.videoUrl}
         voiceoverUrl={result.voiceoverUrl}
-        timestamps={result.timestamps}
         onReset={resetApp}
       />
     );

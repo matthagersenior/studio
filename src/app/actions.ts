@@ -13,15 +13,15 @@ export type GenerationResult = {
   script: string;
   videoUrl: string;
   voiceoverUrl: string;
-  audioDuration: number;
-  timestamps: TimedWord[];
+  timestamps: TimedWord[]; // This will be simulated
+  estimatedDuration: number;
   error?: never;
 } | {
   script?: never;
   videoUrl?: never;
   voiceoverUrl?: never;
-  audioDuration?: never;
   timestamps?: never;
+  estimatedDuration?: never;
   error: string;
 };
 
@@ -46,7 +46,7 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     // Clean the script for TTS and display
     const cleanScript = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    // 2. Generate Voiceover to get duration
+    // 2. Generate Voiceover
     const voiceoverResult = await ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       prompt: cleanScript,
@@ -62,21 +62,23 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       },
     });
     
-    if (!voiceoverResult.media?.url || !voiceoverResult.custom?.audioDurationMillis) {
-      throw new Error('Failed to generate voiceover or get its duration.');
+    if (!voiceoverResult.media?.url) {
+      throw new Error('Failed to generate voiceover.');
     }
     
     const pcmAudioBuffer = Buffer.from(voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1), 'base64');
     const voiceoverUrl = 'data:audio/wav;base64,' + await toWav(pcmAudioBuffer);
-    const audioDuration = voiceoverResult.custom.audioDurationMillis / 1000;
+    
+    // Estimate duration based on script length (words per minute)
+    const words = cleanScript.split(/\s+/);
+    const estimatedDuration = Math.max(5, Math.ceil(words.length / (150 / 60))); // 150 WPM, min 5 seconds
 
-
-    // 3. Generate Video with the correct duration
+    // 3. Generate Video with the estimated duration
     let videoOperation = (await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${cleanScript}`,
         config: {
-            durationSeconds: Math.ceil(audioDuration),
+            durationSeconds: estimatedDuration,
             aspectRatio: '9:16',
         },
     })).operation;
@@ -103,11 +105,9 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     
-    // 5. Create simulated timestamps for karaoke effect
-    const words = cleanScript.split(/\s+/);
-    const totalWords = words.length;
-    const durationPerWord = audioDuration / totalWords;
+    // 5. Create simulated timestamps for karaoke effect - will be refined on client
     const timestamps: TimedWord[] = words.map((word, index) => {
+        const durationPerWord = estimatedDuration / words.length;
         const startTime = index * durationPerWord;
         const endTime = startTime + durationPerWord;
         return { word, startTime, endTime };
@@ -117,8 +117,8 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
       script: cleanScript,
       videoUrl,
       voiceoverUrl,
-      audioDuration,
-      timestamps,
+      timestamps, // Send simulated timestamps
+      estimatedDuration,
     };
 
   } catch (e: any) {
