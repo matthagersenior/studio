@@ -62,7 +62,7 @@ async function generateVideoSequence(script: string): Promise<string[]> {
             model: 'googleai/veo-2.0-generate-001',
             prompt: prompt,
             config: {
-                durationSeconds: 5, // Short clips
+                durationSeconds: 5, 
                 aspectRatio: '9:16',
             },
         })).operation;
@@ -101,7 +101,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const script = await generateScript(prompt);
     const audioUrl = await generateVoiceover(script);
     
-    // Attempt to generate the main video
     try {
         const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 3)));
         
@@ -118,24 +117,16 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
             throw new Error('Video generation did not return an operation.');
         }
 
-        let finalOperation = videoOperation;
-        let checks = 0;
-        const maxChecks = 15; // Wait for up to 30 seconds
-        while (!finalOperation.done && checks < maxChecks) {
+        while (!videoOperation.done) {
             await new Promise(resolve => setTimeout(resolve, 2000));
-            finalOperation = await ai.checkOperation(finalOperation);
-            checks++;
+            videoOperation = await ai.checkOperation(videoOperation);
         }
 
-        if (!finalOperation.done) {
-             throw new Error('Video generation timed out.');
+        if (videoOperation.error) {
+            throw new Error('Video generation failed: ' + videoOperation.error.message);
         }
 
-        if (finalOperation.error) {
-            throw new Error('Video generation failed: ' + finalOperation.error.message);
-        }
-
-        const videoPart = finalOperation.output?.message?.content.find(p => !!p.media);
+        const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
         if (!videoPart || !videoPart.media?.url) {
             throw new Error('Failed to find the generated video in operation result.');
         }
@@ -145,24 +136,12 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
     } catch (e: any) {
         const errorMessage = e.message || '';
-        console.error('Video generation failed, falling back to image sequence.', e);
-
-        // Fallback to image sequence if video fails due to rate limit or other issues
-        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('high demand') || errorMessage.includes('timed out')) {
-            console.log("Fallback: Generating video sequence instead.");
-            const videoUrls = await generateVideoSequence(script);
-            return { script, audioUrl, videoUrls };
-        }
+        console.error('Video generation failed, falling back to video sequence.', e);
         
-        // If it's a different error, we still try to fallback
-        try {
-            console.log("Fallback: Generating video sequence due to other error.");
-            const videoUrls = await generateVideoSequence(script);
-            return { script, audioUrl, videoUrls };
-        } catch (fallbackError: any) {
-            console.error('Video sequence fallback also failed:', fallbackError);
-            return { error: fallbackError.message || "Primary video and fallback video sequence generation both failed." };
-        }
+        // Universal fallback to image sequence on any video error
+        console.log("Fallback: Generating video sequence instead.");
+        const videoUrls = await generateVideoSequence(script);
+        return { script, audioUrl, videoUrls };
     }
 
   } catch (e: any) {

@@ -4,7 +4,6 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX } from "lucide-react";
-import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
@@ -18,26 +17,37 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
   const [audioDuration, setAudioDuration] = useState(0);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 
-  const allMediaRefs = videoUrls ? videoRefs : (videoUrl ? { current: [videoRefs.current[0]] } : { current: [] });
-
+  // Effect to handle playing audio and video together
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
-      audio.src = audioUrl;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(e => {
-          console.error("Audio autoplay was prevented:", e);
-          setIsMuted(true);
-        });
-      }
-    }
-  }, [audioUrl]);
+        audio.src = audioUrl;
 
+        const playMedia = () => {
+            const audioPromise = audio.play();
+            if (audioPromise !== undefined) {
+                audioPromise.catch(e => {
+                    console.error("Audio autoplay was prevented:", e);
+                    setIsMuted(true); // If autoplay fails, stay muted
+                });
+            }
+
+            videoRefs.current.forEach(videoEl => {
+                if (videoEl) {
+                    videoEl.play().catch(e => console.error("Video autoplay failed", e));
+                }
+            });
+        };
+
+        playMedia();
+    }
+  }, [audioUrl, videoUrl, videoUrls]);
+
+  // Effect to sync video sequence with audio
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !videoUrls || videoUrls.length === 0 || !audioDuration) return;
@@ -55,35 +65,11 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
     audio.addEventListener('timeupdate', handleTimeUpdate);
   
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      if (audio) {
+          audio.removeEventListener('timeupdate', handleTimeUpdate);
+      }
     };
   }, [videoUrls, audioDuration, currentVideoIndex]);
-
-  useEffect(() => {
-    const allVideos = videoRefs.current.filter(Boolean) as HTMLVideoElement[];
-    const audio = audioRef.current;
-
-    if (allVideos.length > 0 && audio) {
-        const syncPlayback = () => {
-            allVideos.forEach(video => {
-                if (audio.paused) video.pause();
-                else video.play().catch(e => console.error("Video play failed", e));
-            });
-        };
-
-        audio.addEventListener('play', syncPlayback);
-        audio.addEventListener('pause', syncPlayback);
-
-        // Initial sync
-        syncPlayback();
-
-        return () => {
-            audio.removeEventListener('play', syncPlayback);
-            audio.removeEventListener('pause', syncPlayback);
-        };
-    }
-}, [videoUrl, videoUrls, audioDuration]);
-
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
@@ -106,7 +92,6 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <audio
         ref={audioRef}
-        autoPlay
         loop
         muted={isMuted}
         onLoadedMetadata={handleAudioMetadata}
@@ -120,9 +105,8 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
               key={videoUrl}
               className="absolute top-0 left-0 w-full h-full object-cover"
               src={videoUrl}
-              autoPlay
               loop
-              muted
+              muted // All videos are always muted to sync with single audio source
               playsInline
             />
           )}
@@ -135,9 +119,8 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, onReset }: 
                   ref={el => videoRefs.current[index] = el}
                   src={url}
                   className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${index === currentVideoIndex ? 'opacity-100' : 'opacity-0'}`}
-                  autoPlay
                   loop
-                  muted
+                  muted // All videos are always muted
                   playsInline
                 />
               ))}
