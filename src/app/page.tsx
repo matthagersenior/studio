@@ -61,12 +61,14 @@ export default function Home() {
   
   if (result && !result.error) {
     return (
-      <StoryResult 
-        script={result.script} 
-        videoUrl={result.videoUrl} 
-        onReset={resetApp} 
+      <StoryResult
+        script={result.script}
+        videoUrl={result.videoUrl}
+        voiceoverUrl={result.voiceoverUrl}
+        timestamps={result.timestamps}
+        onReset={resetApp}
       />
-    )
+    );
   }
   
   if (isLoading) {

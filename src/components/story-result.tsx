@@ -3,30 +3,46 @@
 import { Button } from "./ui/button";
 import { useEffect, useRef } from "react";
 import { KaraokeScript } from "./karaoke-script";
+import type { TimedWord } from "@/app/actions";
+
 
 interface StoryResultProps {
   script: string;
   videoUrl: string;
+  voiceoverUrl: string;
+  timestamps: TimedWord[];
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, voiceoverUrl, timestamps, onReset }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (video) {
+    const audio = audioRef.current;
+
+    if (video && audio) {
         // Muted is necessary for autoplay in most browsers
         video.muted = true; 
-        video.play().catch(e => console.error("Video autoplay failed", e));
+        
+        const playPromise = video.play();
+        const audioPromise = audio.play();
+
+        Promise.all([playPromise, audioPromise]).catch(e => {
+          // One of the playbacks failed, likely due to browser restrictions.
+          // We can unmute the video and rely on user interaction to start audio.
+          if(video) video.muted = false;
+          console.error("Media autoplay failed", e)
+        });
     }
-  }, [videoUrl]);
+  }, [videoUrl, voiceoverUrl]);
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl h-full flex flex-col md:aspect-[16/9] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
+      <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         
-        <div className="relative w-full aspect-[16/9] md:h-full rounded-lg overflow-hidden shrink-0">
+        <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0">
           <video
             ref={videoRef}
             key={videoUrl}
@@ -37,6 +53,13 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
             muted
             playsInline
           />
+           <audio
+            ref={audioRef}
+            key={voiceoverUrl}
+            src={voiceoverUrl}
+            autoPlay
+            loop
+          />
         </div>
 
         <div 
@@ -44,8 +67,8 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
           style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
         >
             <KaraokeScript 
-              script={script}
-              videoRef={videoRef}
+              timestamps={timestamps}
+              videoRef={videoRef} // karaoke syncs to video time now
             />
         </div>
 
