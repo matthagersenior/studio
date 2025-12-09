@@ -50,8 +50,8 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
           },
-          enableTimepoints: true,
         },
+        enableTimepoints: true,
       },
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
     });
