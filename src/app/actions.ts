@@ -1,27 +1,14 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
-import { toWav } from "@/lib/wav-converter";
-
-export type WordTimestamp = {
-  word: string;
-  startSeconds: number;
-  endSeconds: number;
-};
 
 export type GenerationResult = {
   script: string;
   videoUrl: string;
-  voiceoverMedia: string;
-  audioDuration: number;
-  timestamps: WordTimestamp[];
   error?: never;
 } | {
   script?: never;
   videoUrl?: never;
-  voiceoverMedia?: never;
-  audioDuration?: never;
-  timestamps?: never;
   error: string;
 };
 
@@ -42,43 +29,12 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         return { error: 'Failed to generate story script.' };
     }
     
-    const voiceoverPromise = ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      config: {
-        speechConfig: {
-            responseModalities: ['AUDIO'],
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
-            },
-        }
-      },
-      prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
-    });
-    
-    const [voiceoverResult] = await Promise.allSettled([
-      voiceoverPromise,
-    ]);
-
-    if (voiceoverResult.status === 'rejected' || !voiceoverResult.value.media.url) {
-      console.error('Voiceover generation failed:', voiceoverResult.reason);
-      return { error: 'Failed to generate voiceover.' };
-    }
-    
-    const audioBuffer = Buffer.from(
-      voiceoverResult.value.media.url.substring(voiceoverResult.value.media.url.indexOf(',') + 1),
-      'base64'
-    );
-
-    const sampleRate = 24000;
-    const bitDepth = 16;
-    const channels = 1;
-    const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
-    
+    // 2. Generate Video
     const { operation } = await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: `Hyper-saturated, 8K, cinematic wide shot, volumetric lighting, photorealistic but surreal, low-fidelity effects, art direction based on this absurd script: ${script}`,
         config: {
-            durationSeconds: Math.max(5, Math.min(8, Math.ceil(audioDuration))),
+            durationSeconds: 8, // Fixed duration
             aspectRatio: '16:9',
         },
     });
@@ -104,17 +60,11 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     
     const videoUrl = `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
     
-    const timestamps: WordTimestamp[] = [];
-    const voiceoverMedia = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
-    
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
     return {
       script,
       videoUrl,
-      voiceoverMedia,
-      audioDuration,
-      timestamps
     };
 
   } catch (e: any) {

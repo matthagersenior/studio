@@ -1,59 +1,37 @@
 "use client";
 
 import { useState, useEffect, useMemo, RefObject } from 'react';
-import { WordTimestamp } from '@/app/actions';
 import { ScrollArea } from './ui/scroll-area';
 
 interface KaraokeScriptProps {
   script: string;
-  timestamps: WordTimestamp[];
-  audioRef: RefObject<HTMLAudioElement>;
+  videoRef: RefObject<HTMLVideoElement>;
 }
 
-// A simple utility to clean words for matching purposes
-const cleanWord = (word: string) => {
-  return word.toLowerCase().replace(/[.,!?;:]/g, '');
-};
-
-export function KaraokeScript({ script, timestamps, audioRef }: KaraokeScriptProps) {
+export function KaraokeScript({ script, videoRef }: KaraokeScriptProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
+  const scriptWords = useMemo(() => script.split(/\s+/), [script]);
+  const wordCount = scriptWords.length;
+  // Estimate reading time and derive word duration.
+  const estimatedReadingTimeSeconds = wordCount / 3; // Approx. 3 words per second
+  const wordDuration = estimatedReadingTimeSeconds / wordCount;
+
+
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const video = videoRef.current;
+    if (!video) return;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      setCurrentTime(video.currentTime);
     };
 
-    audio.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [audioRef]);
-
-  // Memoize the processed words from the script to avoid recalculating on every render
-  const scriptWords = useMemo(() => script.split(/\s+/), [script]);
-
-  // Find the index of the currently spoken word
-  const currentWordIndex = useMemo(() => {
-    if (!timestamps || timestamps.length === 0) return -1;
-    
-    // Find the last timestamp whose start time is before the current audio time
-    const currentTimestampIndex = timestamps.findIndex(
-      (t, i) =>
-        currentTime >= t.startSeconds &&
-        (i === timestamps.length - 1 || currentTime < timestamps[i + 1].startSeconds)
-    );
-
-    if (currentTimestampIndex === -1) return -1;
-
-    // This is a naive mapping. It assumes the words in the script and timestamps align perfectly.
-    // A more robust solution might involve more complex matching logic.
-    return currentTimestampIndex;
-
-  }, [currentTime, timestamps]);
+  }, [videoRef]);
 
   const timestampedWords = useMemo(() => {
     return script.split(/(\s+)/); // Split by space, keeping spaces
@@ -69,8 +47,11 @@ export function KaraokeScript({ script, timestamps, audioRef }: KaraokeScriptPro
           if (!isWhitespace) {
             wordCounter++;
           }
-          const isSpoken = wordCounter < currentWordIndex;
-          const isSpeaking = wordCounter === currentWordIndex;
+
+          const wordStartTime = wordCounter * wordDuration;
+          const isSpoken = currentTime >= wordStartTime + wordDuration;
+          const isSpeaking = currentTime >= wordStartTime && currentTime < wordStartTime + wordDuration;
+
 
           return (
             <span

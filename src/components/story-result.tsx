@@ -1,30 +1,26 @@
 "use client";
 
-import { AudioPlayer } from "./audio-player";
 import { Button } from "./ui/button";
-import { useEffect, useRef, useState } from "react";
-import type { WordTimestamp } from "@/app/actions";
+import { useEffect, useRef } from "react";
 import { KaraokeScript } from "./karaoke-script";
 
 interface StoryResultProps {
   script: string;
   videoUrl: string;
-  voiceoverMedia: string;
-  timestamps: WordTimestamp[];
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, voiceoverMedia, timestamps, onReset }: StoryResultProps) {
-  const [startPlayback, setStartPlayback] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
+export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-        setStartPlayback(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    const video = videoRef.current;
+    if (video) {
+        // Muted is necessary for autoplay in most browsers
+        video.muted = true; 
+        video.play().catch(e => console.error("Video autoplay failed", e));
+    }
+  }, [videoUrl]);
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
@@ -32,6 +28,7 @@ export function StoryResult({ script, videoUrl, voiceoverMedia, timestamps, onRe
         
         <div className="relative w-full aspect-[16/9] md:h-full rounded-lg overflow-hidden shrink-0">
           <video
+            ref={videoRef}
             key={videoUrl}
             className="absolute top-0 left-0 w-full h-full object-cover"
             src={videoUrl}
@@ -40,9 +37,6 @@ export function StoryResult({ script, videoUrl, voiceoverMedia, timestamps, onRe
             muted
             playsInline
           />
-           <div className="md:hidden absolute inset-0 bg-black/30 flex items-center justify-center">
-            <AudioPlayer ref={audioRef} src={voiceoverMedia} autoPlay={startPlayback} />
-          </div>
         </div>
 
         <div 
@@ -51,13 +45,8 @@ export function StoryResult({ script, videoUrl, voiceoverMedia, timestamps, onRe
         >
             <KaraokeScript 
               script={script}
-              timestamps={timestamps}
-              audioRef={audioRef}
+              videoRef={videoRef}
             />
-        </div>
-
-        <div className="w-full mt-auto hidden md:flex md:absolute md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:mt-0 md:w-auto">
-            <AudioPlayer ref={audioRef} src={voiceoverMedia} autoPlay={startPlayback} />
         </div>
 
         <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0">

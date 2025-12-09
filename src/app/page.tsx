@@ -64,8 +64,6 @@ export default function Home() {
       <StoryResult 
         script={result.script} 
         videoUrl={result.videoUrl} 
-        voiceoverMedia={result.voiceoverMedia}
-        timestamps={result.timestamps}
         onReset={resetApp} 
       />
     )
