@@ -57,7 +57,7 @@ export function StoryResult({ script, visualUrl, voiceoverMedia, onReset }: Stor
 
         <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0">
             <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
-                ROTTEN ENOUGH (Start Over)
+                ROTTEN ENOUGH
             </Button>
         </div>
       </div>
