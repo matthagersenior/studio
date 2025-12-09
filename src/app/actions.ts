@@ -45,11 +45,9 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
     const voiceoverPromise = ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
-        speechConfig: {
-            responseModalities: ['AUDIO'],
-            voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
-            },
+        responseModalities: ['AUDIO'],
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'Zubenelgenubi' },
         },
       },
       prompt: `Narrate this script with a deep, dramatic, and slightly ominous cinematic voice: ${script}`,
