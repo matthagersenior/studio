@@ -35,6 +35,9 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  watchOptions: {
+    ignored: ['**/next.config.ts'],
+  },
 };
 
 export default nextConfig;
