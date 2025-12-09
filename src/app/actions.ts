@@ -35,7 +35,7 @@ async function generateVoiceover(script: string): Promise<string> {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' }, // A more dramatic voice
+            prebuiltVoiceConfig: { voiceName: 'Algenib' }, // A dramatic voice
           },
         },
     },
@@ -72,7 +72,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         model: 'googleai/veo-2.0-generate-001',
         prompt: [
             { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. Script: ${script}` },
-            { media: { url: imageUri } }
+            { media: { url: imageUri, contentType: 'image/png' } }
         ],
         config: {
             durationSeconds: estimatedDuration,
