@@ -9,9 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { generateStory } from "@/app/actions";
+import { generateAndSaveStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clapperboard, LogOut } from "lucide-react";
+import { useUser } from "@/firebase";
+import { auth } from "@/firebase/client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 
 import type { GenerationResult } from "@/app/actions";
 
@@ -24,6 +29,9 @@ export default function Home() {
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -33,10 +41,19 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Not Logged In",
+        description: "You must be logged in to create a story.",
+      });
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
 
-    const response = await generateStory(values.prompt);
+    const response = await generateAndSaveStory(values.prompt);
     
     if (response.error) {
       toast({
@@ -54,6 +71,24 @@ export default function Home() {
   function resetApp() {
     setResult(null);
   }
+  
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/login');
+  };
+
+  if (isUserLoading) {
+    return (
+      <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
+        <Loader2 className="h-12 w-12 text-white animate-spin" />
+      </main>
+    )
+  }
+
+  if (!user) {
+    router.push('/login');
+    return null; 
+  }
 
   if (result && !result.error && result.visualUrl) {
     return (
@@ -69,6 +104,17 @@ export default function Home() {
 
   return (
     <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
+       <div className="absolute top-4 right-4 flex gap-2">
+        <Link href="/gallery">
+          <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+            <Clapperboard className="mr-2 h-5 w-5" /> My Gallery
+          </Button>
+        </Link>
+        <Button onClick={handleLogout} variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+          <LogOut className="mr-2 h-5 w-5" /> Logout
+        </Button>
+      </div>
+
       <div className="max-w-4xl mx-auto space-y-8 w-full">
         <header className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">

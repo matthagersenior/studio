@@ -2,6 +2,10 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import { auth } from "@/firebase";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, serverTimestamp } from "firebase/firestore";
+import { firestore } from "@/firebase";
 
 export type GenerationResult = {
   script: string;
@@ -17,13 +21,17 @@ export type GenerationResult = {
   error: string;
 };
 
-
-export async function generateStory(prompt: string): Promise<GenerationResult> {
+export async function generateAndSaveStory(prompt: string): Promise<GenerationResult> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
   }
 
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      return { error: 'You must be logged in to create a story.' };
+    }
+
     // 1. Generate Story Script 
     const scriptResponse = await ai.generate({
       prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Prompt: ${prompt}`,
@@ -101,12 +109,21 @@ export async function generateStory(prompt: string): Promise<GenerationResult> {
         throw new Error(reason);
     }
     
-
     // 5. Calculate audio duration
     const sampleRate = 24000; // As per the model's output
     const bitDepth = 16; // PCM16
     const channels = 1; // Mono
     const audioDuration = audioBuffer.length / (sampleRate * (bitDepth / 8) * channels);
+
+    // 6. Save to Firestore (non-blocking)
+    const contentCollectionRef = collection(firestore, 'users', user.uid, 'generatedContent');
+    addDocumentNonBlocking(contentCollectionRef, {
+        prompt: prompt,
+        storyScript: script.replace(/---/g, '\n\n'),
+        visualUrl,
+        voiceoverUrl: voiceoverMedia, // Saving the base64 data URI directly
+        createdAt: serverTimestamp(),
+    });
 
     return {
       script: script.replace(/---/g, '\n\n'),
