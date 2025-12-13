@@ -45,7 +45,7 @@ async function generateVideoFromImage(imageUrl: string, script: string): Promise
         model: googleAI.model('veo-2.0-generate-001'),
         prompt: [
             { text: `Animate this image in a short, looping, chaotic, meme-worthy style based on the following script: ${script}` },
-            { media: { url: imageUrl } },
+            { media: { url: imageUrl, contentType: 'image/png' } },
         ],
         config: {
             durationSeconds: 6,
@@ -80,7 +80,20 @@ async function generateVideoFromImage(imageUrl: string, script: string): Promise
     if (!video?.media?.url) {
         throw new Error('Generated video content could not be found.');
     }
-    return video.media.url;
+    const fetch = (await import('node-fetch')).default;
+    const videoDownloadResponse = await fetch(
+      `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
+    );
+     if (
+      !videoDownloadResponse ||
+      videoDownloadResponse.status !== 200 ||
+      !videoDownloadResponse.body
+    ) {
+      throw new Error('Failed to fetch video');
+    }
+    const videoBuffer = await videoDownloadResponse.arrayBuffer();
+
+    return `data:video/mp4;base64,${Buffer.from(videoBuffer).toString('base64')}`;
 }
 
 
