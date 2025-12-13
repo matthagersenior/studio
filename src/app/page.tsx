@@ -103,8 +103,7 @@ export default function Home() {
     return (
       <StoryResult
         script={generationResult.script}
-        imageUrl={generationResult.imageUrl}
-        audioUrl={generationResult.audioUrl}
+        videoUrl={generationResult.videoUrl}
         onReset={resetApp}
       />
     );

@@ -9,74 +9,74 @@ import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  imageUrl?: string;
-  audioUrl?: string;
+  videoUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
 
   // Effect to initialize media and play
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
 
-    audio.src = audioUrl;
-    audio.loop = true;
-    audio.muted = isMuted;
+    video.src = videoUrl;
+    video.muted = true; // Start muted for autoplay
+    video.loop = true;
+    video.playsInline = true;
 
-    // Attempt to play audio
-    const playPromise = audio.play();
+    const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise.catch(e => {
-        console.error("Audio autoplay failed:", e);
-        // Autoplay was prevented. The user needs to interact to start audio.
-        // The mute toggle will handle this.
+        console.error("Video autoplay failed:", e);
+        // Autoplay was prevented. User interaction (mute toggle) will be required.
       });
     }
 
-    return () => {
-      // Cleanup
-      audio.pause();
-      audio.removeAttribute('src');
+    const handleLoadedMetadata = () => {
+        if (video.duration > 0) {
+            setMediaDuration(video.duration);
+        }
     };
-  }, [audioUrl, isMuted]);
+    
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+    // Cleanup function
+    return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        if (video) {
+            video.pause();
+            video.removeAttribute('src'); // Free up memory
+        }
+    };
+  }, [videoUrl]);
 
   const handleMuteToggle = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const video = videoRef.current;
+    if (!video) return;
     
-    const newMutedState = !audio.muted;
+    const newMutedState = !video.muted;
     setIsMuted(newMutedState);
-    audio.muted = newMutedState;
+    video.muted = newMutedState;
 
-    // If unmuting, might need to replay to satisfy browser policy
-    if (!newMutedState && audio.paused) {
-        audio.play().catch(e => console.error("Audio play failed on unmute:", e));
-    }
-  };
-  
-  const handleMediaMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
-    const newDuration = e.currentTarget.duration;
-    if (newDuration > 0) {
-      setMediaDuration(newDuration);
+    if (!newMutedState && video.paused) {
+        video.play().catch(e => console.error("Video play failed on unmute:", e));
     }
   };
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      <audio ref={audioRef} onLoadedMetadata={handleMediaMetadata} playsInline />
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
-        {imageUrl && (
-          <Image
-            src={imageUrl}
-            alt="Generated visual"
-            fill
+        
+        {videoUrl && (
+          <video
+            ref={videoRef}
             className="w-full h-full object-cover"
-            priority
+            playsInline
+            loop
           />
         )}
 
@@ -87,7 +87,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
           >
             <KaraokeScript
               script={script}
-              mediaRef={audioRef}
+              mediaRef={videoRef}
               mediaDuration={mediaDuration}
             />
           </div>
