@@ -2,10 +2,12 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
+import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string;
+  imageUrl?: string;
+  audioUrl?: string;
   error?: never;
 };
 
@@ -25,58 +27,40 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateVideoWithSound(prompt: string): Promise<string> {
-    let { operation } = await ai.generate({
-      model: 'googleai/veo-2.0-generate-001',
-      prompt: `Create a cinematic, surreal, and meme-worthy video based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd. Use a 9:16 aspect ratio. The video should have an epic, orchestral, slightly off-key background music track.`,
-      config: {
-        durationSeconds: 5,
-        aspectRatio: '9:16',
-      },
+async function generateInitialImage(prompt: string): Promise<string> {
+    const { media } = await ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Create a cinematic, surreal, and meme-worthy still image based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd, suitable for a short video.`,
     });
 
-    if (!operation) {
-        throw new Error('Video generation operation did not start.');
+    if (!media.url) {
+        throw new Error('Failed to generate initial image.');
     }
+    return media.url;
+}
 
-    // Wait for the operation to complete, with a generous timeout.
-    const maxWaitTime = 120 * 1000; // 2 minutes
-    const checkInterval = 5000; // 5 seconds
-    let elapsedTime = 0;
+async function generateVoiceover(script: string): Promise<string> {
+  const { media } = await ai.generate({
+      model: 'googleai/gemini-2.5-flash-preview-tts',
+      config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+              voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Algenib' },
+              },
+          },
+      },
+      prompt: script,
+  });
 
-    while (!operation.done && elapsedTime < maxWaitTime) {
-        await new Promise((resolve) => setTimeout(resolve, checkInterval));
-        operation = await ai.checkOperation(operation);
-        elapsedTime += checkInterval;
-    }
-    
-    if (!operation.done) {
-        throw new Error('Video generation timed out.');
-    }
+  if (!media?.url) {
+      throw new Error('Failed to generate voiceover.');
+  }
 
-    if (operation.error) {
-        throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
+  const audioBuffer = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
+  const wavBase64 = await toWav(audioBuffer);
 
-    const video = operation.output?.message?.content.find((p) => !!p.media);
-    if (!video?.media?.url) {
-        throw new Error('Failed to find the generated video in the operation result.');
-    }
-
-    // The URL from VEO is temporary and needs to be fetched and re-encoded.
-    const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(
-        `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
-    );
-
-    if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
-        throw new Error(`Failed to fetch video from temporary URL: ${videoDownloadResponse.statusText}`);
-    }
-    
-    const buffer = await videoDownloadResponse.buffer();
-    const contentType = video.media.contentType || 'video/mp4';
-    
-    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  return `data:audio/wav;base64,${wavBase64}`;
 }
 
 
@@ -86,23 +70,25 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Run script and video generation in parallel
-    const [scriptResult, videoResult] = await Promise.allSettled([
-      generateScript(prompt),
-      generateVideoWithSound(prompt),
+    const script = await generateScript(prompt);
+
+    const [imageResult, audioResult] = await Promise.allSettled([
+      generateInitialImage(script), 
+      generateVoiceover(script),
     ]);
-
-    if (scriptResult.status === 'rejected') {
-      throw new Error(`Script generation failed: ${scriptResult.reason?.message || 'Unknown error'}`);
-    }
-
-    if (videoResult.status === 'rejected') {
-      throw new Error(`Video generation failed: ${videoResult.reason?.message || 'Unknown error'}`);
+    
+    if (imageResult.status === 'rejected') {
+      throw new Error(`Image generation failed: ${imageResult.reason?.message || 'Unknown error'}`);
     }
     
+    if (audioResult.status === 'rejected') {
+        throw new Error(`Audio generation failed: ${audioResult.reason?.message || 'Unknown error'}`);
+    }
+
     return { 
-      script: scriptResult.value, 
-      videoUrl: videoResult.value 
+      script, 
+      imageUrl: imageResult.value,
+      audioUrl: audioResult.value,
     };
 
   } catch (e: any) {

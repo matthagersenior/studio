@@ -9,61 +9,62 @@ import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  videoUrl?: string;
+  imageUrl?: string;
+  audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
 
   // Effect to initialize media and play
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
 
-    video.src = videoUrl;
-    video.muted = true; // Start muted for autoplay
-    video.loop = true;
-    video.playsInline = true;
+    audio.src = audioUrl;
+    audio.muted = true;
+    audio.loop = true;
+    audio.playsInline = true;
 
-    const playPromise = video.play();
+    const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(e => {
-        console.error("Video autoplay failed:", e);
+        console.error("Audio autoplay failed:", e);
         // Autoplay was prevented. User interaction (mute toggle) will be required.
       });
     }
 
     const handleLoadedMetadata = () => {
-        if (video.duration > 0) {
-            setMediaDuration(video.duration);
+        if (audio.duration > 0 && isFinite(audio.duration)) {
+            setMediaDuration(audio.duration);
         }
     };
     
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     // Cleanup function
     return () => {
-        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        if (video) {
-            video.pause();
-            video.removeAttribute('src'); // Free up memory
+        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        if (audio) {
+            audio.pause();
+            audio.removeAttribute('src'); // Free up memory
         }
     };
-  }, [videoUrl]);
+  }, [audioUrl]);
 
   const handleMuteToggle = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     
-    const newMutedState = !video.muted;
+    const newMutedState = !audio.muted;
     setIsMuted(newMutedState);
-    video.muted = newMutedState;
+    audio.muted = newMutedState;
 
-    if (!newMutedState && video.paused) {
-        video.play().catch(e => console.error("Video play failed on unmute:", e));
+    if (!newMutedState && audio.paused) {
+        audio.play().catch(e => console.error("Audio play failed on unmute:", e));
     }
   };
 
@@ -71,14 +72,18 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
-        {videoUrl && (
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            playsInline
-            loop
+        {imageUrl && (
+          <Image
+            src={imageUrl}
+            alt="Generated visual"
+            fill
+            className="object-cover animate-kenburns"
+            unoptimized
           />
         )}
+        
+        {/* Hidden Audio element for playback control */}
+        <audio ref={audioRef} className="hidden" />
 
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
@@ -87,7 +92,7 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
           >
             <KaraokeScript
               script={script}
-              mediaRef={videoRef}
+              mediaRef={audioRef}
               mediaDuration={mediaDuration}
             />
           </div>
