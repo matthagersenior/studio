@@ -75,7 +75,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
             { media: { url: imageUri, contentType: 'image/jpeg' } }
         ],
         config: {
-            durationSeconds: 5, 
+            durationSeconds: 5,
         },
     })).operation;
 
@@ -113,7 +113,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
 
 
 async function generateVideoSequence(script: string): Promise<string[]> {
-    console.log("Fallback 1: Generating video sequence.");
     const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
     
     const videoClipPromises = sentences.map(async (sentence) => {
@@ -152,7 +151,6 @@ async function generateVideoSequence(script: string): Promise<string[]> {
 
 
 async function generateImageSequence(script: string): Promise<string[]> {
-    console.log("Fallback 2: Generating image sequence.");
     const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const imagePromises = sentences.map(sentence => 
         ai.generate({
@@ -184,7 +182,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const audioUrl = await generateVoiceover(script);
     
     try {
-      console.log("Attempting primary video generation...");
       const initialImage = await generateInitialImage(prompt);
       const videoUrl = await generateVideoFromImage(script, initialImage);
       return { script, audioUrl, videoUrl };
@@ -192,13 +189,11 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         const isRateLimitError = (msg: string) => msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('quota') || msg.includes('high demand');
         
         if (isRateLimitError(primaryError.message || '')) {
-            console.warn("Primary video generation failed due to rate limits. Attempting fallback 1 (video sequence).");
             try {
                 const videoUrls = await generateVideoSequence(script);
                 return { script, audioUrl, videoUrls };
             } catch (fallback1Error: any) {
                 if (isRateLimitError(fallback1Error.message || '')) {
-                    console.warn("Fallback 1 (video sequence) failed due to rate limits. Attempting fallback 2 (image sequence).");
                     const imageUrls = await generateImageSequence(script);
                     return { script, audioUrl, imageUrls };
                 }
