@@ -51,14 +51,6 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (isUserLoading || !user) {
-        toast({
-            variant: "destructive",
-            title: "Not Signed In",
-            description: "You need to be signed in to generate a story. Please refresh the page.",
-        });
-        return;
-    }
     setLoadingState('generating');
     setGenerationResult(null);
 
