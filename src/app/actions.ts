@@ -9,6 +9,7 @@ export type StoryResultPayload = {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
+  imageUrl?: string; // Keep imageUrl for context if needed, though video is primary
   error?: never;
 };
 
@@ -41,59 +42,22 @@ async function generateInitialImage(prompt: string): Promise<string> {
 }
 
 async function generateVideoFromImage(imageUrl: string, script: string): Promise<string> {
-    let { operation } = await ai.generate({
-        model: googleAI.model('veo-2.0-generate-001'),
+    const { media } = await ai.generate({
+        model: 'googleai/gemini-2.5-flash-image-preview',
         prompt: [
-            { text: `Animate this image in a short, looping, chaotic, meme-worthy style based on the following script: ${script}` },
+            { text: `Animate this image in a short, looping, chaotic, meme-worthy style. The animation should reflect the absurd energy of the following script: ${script}` },
             { media: { url: imageUrl, contentType: 'image/png' } },
         ],
         config: {
-            durationSeconds: 6,
-            aspectRatio: '9:16',
+            responseModalities: ['IMAGE'], // We expect an image/video back
         },
     });
 
-    if (!operation) {
-        throw new Error('Video generation operation failed to start.');
-    }
-    
-    // Increased timeout loop
-    const maxWaitTime = 120000; // 2 minutes
-    const pollInterval = 5000; // 5 seconds
-    let waitedTime = 0;
-
-    while (!operation.done && waitedTime < maxWaitTime) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        waitedTime += pollInterval;
-        operation = await ai.checkOperation(operation);
-    }
-    
-    if (!operation.done) {
-        throw new Error('Video generation timed out.');
+    if (!media?.url) {
+      throw new Error('Generated video content could not be found.');
     }
 
-    if (operation.error) {
-        throw new Error(`Failed to generate video: ${operation.error.message}`);
-    }
-
-    const video = operation.output?.message?.content.find((p) => !!p.media);
-    if (!video?.media?.url) {
-        throw new Error('Generated video content could not be found.');
-    }
-    const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(
-      `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
-    );
-     if (
-      !videoDownloadResponse ||
-      videoDownloadResponse.status !== 200 ||
-      !videoDownloadResponse.body
-    ) {
-      throw new Error('Failed to fetch video');
-    }
-    const videoBuffer = await videoDownloadResponse.arrayBuffer();
-
-    return `data:video/mp4;base64,${Buffer.from(videoBuffer).toString('base64')}`;
+    return media.url;
 }
 
 
@@ -128,12 +92,13 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
+    // Step 1: Generate the script, which is needed for everything else.
     const script = await generateScript(prompt);
     
-    // Step 1: Generate the initial image. This is required for the next step.
+    // Step 2: Generate the initial image. This is required for the video animation.
     const imageUrl = await generateInitialImage(script);
 
-    // Step 2 & 3: Kick off video animation and voiceover generation in parallel
+    // Step 3: Kick off video animation and voiceover generation in parallel
     const [videoResult, audioResult] = await Promise.allSettled([
       generateVideoFromImage(imageUrl, script), 
       generateVoiceover(script),
@@ -150,8 +115,9 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     }
 
     return { 
-      script, 
-      videoUrl: videoResult.value,
+      script,
+      imageUrl, // Pass the original image through
+      videoUrl: videoResult.value, // This will be the animated video/gif
       audioUrl: audioResult.value,
     };
 

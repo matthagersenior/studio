@@ -10,6 +10,7 @@ interface StoryResultProps {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
+  imageUrl?: string;
   onReset: () => void;
 }
 
@@ -36,8 +37,21 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     
     audio?.addEventListener('loadedmetadata', handleAudioMetadata);
 
+    const handleVideoEnd = () => {
+      // When the video (animation) ends, seek both to the start to loop them
+      if(video && audio) {
+        video.currentTime = 0;
+        audio.currentTime = 0;
+        video.play();
+        audio.play();
+      }
+    }
+
+    video?.addEventListener('ended', handleVideoEnd);
+
     return () => {
       audio?.removeEventListener('loadedmetadata', handleAudioMetadata);
+      video?.removeEventListener('ended', handleVideoEnd);
     };
   }, [videoUrl, audioUrl]);
 
@@ -75,9 +89,8 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   };
   
   const handleMuteToggle = (currentlyMuted: boolean) => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!audio) return;
     
     const newMutedState = !currentlyMuted;
     setIsMuted(newMutedState);
@@ -98,7 +111,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
             ref={videoRef}
             src={videoUrl}
             playsInline
-            loop
+            loop // The video itself should loop
             muted // Video is always muted, audio is handled by the separate audio element
             className="w-full h-full object-cover"
           />
