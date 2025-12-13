@@ -4,67 +4,88 @@
 import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
-import { Volume2, VolumeX } from "lucide-react";
-import Image from "next/image";
+import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 
 interface StoryResultProps {
   script: string;
-  imageUrl?: string;
+  videoUrl?: string;
   audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // Effect to initialize media and play
+  // Effect to initialize media sources
   useEffect(() => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
 
-    audio.src = audioUrl;
-    audio.muted = true;
-    audio.loop = true;
-    audio.playsInline = true;
+    if (video && videoUrl) video.src = videoUrl;
+    if (audio && audioUrl) audio.src = audioUrl;
 
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(e => {
-        console.error("Audio autoplay failed:", e);
-        // Autoplay was prevented. User interaction (mute toggle) will be required.
-      });
-    }
-
-    const handleLoadedMetadata = () => {
-        if (audio.duration > 0 && isFinite(audio.duration)) {
-            setMediaDuration(audio.duration);
-        }
+    const handleAudioMetadata = () => {
+      if (audio && audio.duration > 0 && isFinite(audio.duration)) {
+        setMediaDuration(audio.duration);
+      }
     };
     
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio?.addEventListener('loadedmetadata', handleAudioMetadata);
 
-    // Cleanup function
     return () => {
-        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        if (audio) {
-            audio.pause();
-            audio.removeAttribute('src'); // Free up memory
-        }
+      audio?.removeEventListener('loadedmetadata', handleAudioMetadata);
     };
-  }, [audioUrl]);
+  }, [videoUrl, audioUrl]);
 
-  const handleMuteToggle = () => {
+
+  const playMedia = () => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!video || !audio) return;
     
-    const newMutedState = !audio.muted;
+    video.play().catch(e => console.error("Video play failed:", e));
+    audio.play().catch(e => console.error("Audio play failed:", e));
+    setIsPlaying(true);
+  };
+
+  const pauseMedia = () => {
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (!video || !audio) return;
+
+    video.pause();
+    audio.pause();
+    setIsPlaying(false);
+  };
+
+  const handlePlayPauseToggle = () => {
+    if (isPlaying) {
+      pauseMedia();
+    } else {
+      // Unmute and play if it's the first interaction
+      if (isMuted) {
+        handleMuteToggle(false); // Unmute
+      }
+      playMedia();
+    }
+  };
+  
+  const handleMuteToggle = (currentlyMuted: boolean) => {
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (!video || !audio) return;
+    
+    const newMutedState = !currentlyMuted;
     setIsMuted(newMutedState);
     audio.muted = newMutedState;
 
-    if (!newMutedState && audio.paused) {
-        audio.play().catch(e => console.error("Audio play failed on unmute:", e));
+    // If unmuting for the first time, try to play
+    if (!newMutedState && !isPlaying) {
+        playMedia();
     }
   };
 
@@ -72,18 +93,18 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
-        {imageUrl && (
-          <Image
-            src={imageUrl}
-            alt="Generated visual"
-            fill
-            className="object-cover animate-kenburns"
-            unoptimized
+        {videoUrl && (
+           <video
+            ref={videoRef}
+            src={videoUrl}
+            playsInline
+            loop
+            muted // Video is always muted, audio is handled by the separate audio element
+            className="w-full h-full object-cover"
           />
         )}
         
-        {/* Hidden Audio element for playback control */}
-        <audio ref={audioRef} className="hidden" />
+        <audio ref={audioRef} muted={isMuted} loop />
 
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
@@ -97,13 +118,19 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
             />
           </div>
         </div>
+        
+        <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+            <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
+                ROTTEN ENOUGH
+            </Button>
+        </div>
 
-        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10">
-          <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
-              ROTTEN ENOUGH
-          </Button>
-          <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
+        <div className="absolute bottom-4 left-4 right-4 flex justify-center items-center z-10 space-x-4">
+          <Button onClick={() => handleMuteToggle(isMuted)} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
             {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </Button>
+          <Button onClick={handlePlayPauseToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12">
+            {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
           </Button>
         </div>
       </div>

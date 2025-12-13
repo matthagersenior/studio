@@ -3,10 +3,11 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import { googleAI } from '@genkit-ai/google-genai';
 
 export type StoryResultPayload = {
   script: string;
-  imageUrl?: string;
+  videoUrl?: string;
   audioUrl?: string;
   error?: never;
 };
@@ -30,7 +31,7 @@ async function generateScript(prompt: string): Promise<string> {
 async function generateInitialImage(prompt: string): Promise<string> {
     const { media } = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a cinematic, surreal, and meme-worthy animated still image (like a GIF) based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd, suitable for a short video.`,
+        prompt: `Create a cinematic, surreal, and meme-worthy animated still image based on this script: "${prompt}". The style should be dramatic, high-energy, and slightly absurd.`,
     });
 
     if (!media.url) {
@@ -38,6 +39,50 @@ async function generateInitialImage(prompt: string): Promise<string> {
     }
     return media.url;
 }
+
+async function generateVideoFromImage(imageUrl: string, script: string): Promise<string> {
+    let { operation } = await ai.generate({
+        model: googleAI.model('veo-2.0-generate-001'),
+        prompt: [
+            { text: `Animate this image in a short, looping, chaotic, meme-worthy style based on the following script: ${script}` },
+            { media: { url: imageUrl } },
+        ],
+        config: {
+            durationSeconds: 6,
+            aspectRatio: '9:16',
+        },
+    });
+
+    if (!operation) {
+        throw new Error('Video generation operation failed to start.');
+    }
+    
+    // Increased timeout loop
+    const maxWaitTime = 120000; // 2 minutes
+    const pollInterval = 5000; // 5 seconds
+    let waitedTime = 0;
+
+    while (!operation.done && waitedTime < maxWaitTime) {
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        waitedTime += pollInterval;
+        operation = await ai.checkOperation(operation);
+    }
+    
+    if (!operation.done) {
+        throw new Error('Video generation timed out.');
+    }
+
+    if (operation.error) {
+        throw new Error(`Failed to generate video: ${operation.error.message}`);
+    }
+
+    const video = operation.output?.message?.content.find((p) => !!p.media);
+    if (!video?.media?.url) {
+        throw new Error('Generated video content could not be found.');
+    }
+    return video.media.url;
+}
+
 
 async function generateVoiceover(script: string): Promise<string> {
   const { media } = await ai.generate({
@@ -71,23 +116,29 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
   try {
     const script = await generateScript(prompt);
+    
+    // Step 1: Generate the initial image. This is required for the next step.
+    const imageUrl = await generateInitialImage(script);
 
-    const [imageResult, audioResult] = await Promise.allSettled([
-      generateInitialImage(script), 
+    // Step 2 & 3: Kick off video animation and voiceover generation in parallel
+    const [videoResult, audioResult] = await Promise.allSettled([
+      generateVideoFromImage(imageUrl, script), 
       generateVoiceover(script),
     ]);
     
-    if (imageResult.status === 'rejected') {
-      throw new Error(`Image generation failed: ${imageResult.reason?.message || 'Unknown error'}`);
+    if (videoResult.status === 'rejected') {
+      console.error("Video generation failed:", videoResult.reason);
+      throw new Error(`Video generation failed: ${videoResult.reason?.message || 'Unknown error'}`);
     }
     
     if (audioResult.status === 'rejected') {
+        console.error("Audio generation failed:", audioResult.reason);
         throw new Error(`Audio generation failed: ${audioResult.reason?.message || 'Unknown error'}`);
     }
 
     return { 
       script, 
-      imageUrl: imageResult.value,
+      videoUrl: videoResult.value,
       audioUrl: audioResult.value,
     };
 
