@@ -5,138 +5,74 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX } from "lucide-react";
-import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  audioUrl: string;
+  audioUrl: string; // This will now be ignored, but we keep it to not break the action's return type yet.
   videoUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResultProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  
   const [isMuted, setIsMuted] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // This effect handles initializing and playing the media
+  // Effect to initialize the video
   useEffect(() => {
-    const audio = audioRef.current;
     const video = videoRef.current;
-    if (!audio || !video) return;
+    if (!video || !videoUrl) return;
 
-    // Set sources
-    audio.src = audioUrl;
-    if (videoUrl) {
-      video.src = videoUrl;
-    }
+    video.src = videoUrl;
+    video.muted = true;
+    video.loop = true; // Loop the video for a better experience
+    video.playsInline = true;
 
-    const playMedia = async () => {
-      // Always start the video muted to comply with autoplay policies
-      video.muted = true;
-      audio.muted = true;
-      setIsMuted(true);
+    // Attempt to play the video once it's ready
+    video.play().catch(e => {
+      console.error("Video autoplay was prevented.", e);
+      // If autoplay is blocked, the user will need to interact to start.
+      // The mute/unmute button will serve this purpose.
+    });
 
-      try {
-        await video.play();
-        // We don't play the audio here, we sync it to the video's timeupdate
-      } catch (e) {
-        console.error("Video autoplay was prevented.", e);
-      }
-    };
-    
-    playMedia();
-
-  }, [audioUrl, videoUrl]);
-
-
-  // This effect handles syncing audio to video
-  useEffect(() => {
-    const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video) return;
-
-    const handleVideoTimeUpdate = () => {
-      // Sync audio current time to video current time
-      if (Math.abs(video.currentTime - audio.currentTime) > 0.1) {
-        audio.currentTime = video.currentTime;
-      }
-      if (video.paused !== audio.paused) {
-          if (video.paused) audio.pause();
-          else audio.play().catch(e => console.error("Audio sync play failed", e));
-      }
-    };
-
-    const handleVideoPlay = () => {
-      audio.play().catch(e => console.error("Audio play on video sync failed.", e));
-    };
-
-    const handleVideoPause = () => {
-      audio.pause();
-    };
-
-    const handleVideoEnded = () => {
-      onReset(); // Go back to the main page when video finishes
-    };
-    
-    video.addEventListener('timeupdate', handleVideoTimeUpdate);
-    video.addEventListener('play', handleVideoPlay);
-    video.addEventListener('pause', handleVideoPause);
-    video.addEventListener('ended', handleVideoEnded);
-
-    return () => {
-      video.removeEventListener('timeupdate', handleVideoTimeUpdate);
-      video.removeEventListener('play', handleVideoPlay);
-      video.removeEventListener('pause', handleVideoPause);
-      video.removeEventListener('ended', handleVideoEnded);
-    };
-
-  }, [onReset]);
-
+  }, [videoUrl]);
 
   const handleMuteToggle = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
     const newMutedState = !isMuted;
+    video.muted = newMutedState;
     setIsMuted(newMutedState);
-    if (audioRef.current) {
-      audioRef.current.muted = newMutedState;
-    }
-    // The video should remain muted visually for the user to hear the synced audio
-    if (videoRef.current) {
-        videoRef.current.muted = true;
-    }
+
     // If we are unmuting and the video is paused, play it.
-     if (videoRef.current && !newMutedState && videoRef.current.paused) {
-        videoRef.current.play().catch(e => console.error("Could not play video on unmute.", e));
-      }
+    // This helps start playback on browsers that block autoplay.
+    if (!newMutedState && video.paused) {
+      video.play().catch(e => console.error("Could not play video on unmute.", e));
+    }
   };
   
-  const handleMediaMetadata = (e: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
+  const handleMediaMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const newDuration = e.currentTarget.duration;
-    // Use the video's duration as the source of truth
-    if (e.currentTarget.tagName === 'VIDEO' && newDuration > 0) {
+    if (newDuration > 0) {
       setMediaDuration(newDuration);
     }
   };
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      <audio
-        ref={audioRef}
-        playsInline
-        muted={isMuted}
-      />
       {/* Aspect ratio container for mobile and desktop */}
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          loop={false} 
-          muted={true} // Video is always muted, audio comes from the <audio> element
-          playsInline
-          onLoadedMetadata={handleMediaMetadata}
-        />
+        {videoUrl && (
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              playsInline
+              loop
+              muted={isMuted} // Control mute state directly
+              onLoadedMetadata={handleMediaMetadata}
+            />
+        )}
 
         {/* Overlay Container */}
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">

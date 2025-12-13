@@ -26,6 +26,8 @@ export function KaraokeScript({ script, mediaRef, mediaDuration }: KaraokeScript
     // Total "units" = total characters + number of words (for spaces)
     const totalChars = words.reduce((acc, w) => acc + w.word.length, 0);
     const totalUnits = totalChars + words.length -1;
+    if (totalUnits <= 0) return [];
+
     const timePerUnit = mediaDuration / totalUnits;
     
     let accumulatedTime = 0;
