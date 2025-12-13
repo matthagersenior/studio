@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string;
+  imageUrl?: string;
   audioUrl?: string;
   error?: never;
 };
@@ -29,62 +29,17 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateInitialImage(prompt: string): Promise<string> {
+async function generateCinematicImage(prompt: string): Promise<string> {
     const imageResponse = await ai.generate({
       model: 'googleai/imagen-4.0-fast-generate-001',
-      prompt: `Create a single cinematic, surreal, and meme-worthy image based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd. Use a 9:16 aspect ratio. This image will be used as the starting point for an animation.`,
+      prompt: `Create a single cinematic, surreal, and meme-worthy image based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd. Use a 9:16 aspect ratio.`,
     });
 
     if (!imageResponse.media?.url) {
-        throw new Error('Failed to generate the initial image.');
+        throw new Error('Failed to generate the cinematic image.');
     }
     return imageResponse.media.url;
 }
-
-
-async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
-    let videoOperation = (await ai.generate({
-        model: 'googleai/veo-2.0-generate-001',
-        prompt: [
-            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. This will be a silent video. Script: ${script}` },
-            { media: { url: imageUri, contentType: 'image/jpeg' } }
-        ],
-        config: {
-          durationSeconds: 5,
-          aspectRatio: '9:16'
-        }
-    })).operation;
-
-    if (!videoOperation) {
-        throw new Error('Video generation did not return an operation.');
-    }
-
-    while (!videoOperation.done) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Increase wait time
-        videoOperation = await ai.checkOperation(videoOperation);
-    }
-
-    if (videoOperation.error) {
-        throw new Error(`Video generation failed: ${videoOperation.error.message}`);
-    }
-
-    const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
-    if (!videoPart || !videoPart.media?.url) {
-        throw new Error('Failed to find the generated video in the operation result.');
-    }
-    
-    const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
-
-    if (!videoDownloadResponse.ok) {
-        throw new Error(`Failed to download video: ${videoDownloadResponse.statusText}`);
-    }
-
-    const videoBuffer = await videoDownloadResponse.arrayBuffer();
-    const videoBase64 = Buffer.from(videoBuffer).toString('base64');
-
-    return `data:video/mp4;base64,${videoBase64}`;
-}
-
 
 async function generateVoiceover(script: string): Promise<string> {
   const { media } = await ai.generate({
@@ -122,25 +77,23 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    const initialImage = await generateInitialImage(prompt);
-    
-    // Run video and audio generation in parallel
-    const [videoResult, audioResult] = await Promise.allSettled([
-      generateVideoFromImage(script, initialImage),
+    // Run image and audio generation in parallel
+    const [imageResult, audioResult] = await Promise.allSettled([
+      generateCinematicImage(prompt),
       generateVoiceover(script),
     ]);
 
-    if (videoResult.status === 'rejected') {
-      throw new Error(`Video generation failed: ${videoResult.reason?.message || 'Unknown error'}`);
+    if (imageResult.status === 'rejected') {
+      throw new Error(`Image generation failed: ${imageResult.reason?.message || 'Unknown error'}`);
     }
-    
+
     if (audioResult.status === 'rejected') {
       throw new Error(`Audio generation failed: ${audioResult.reason?.message || 'Unknown error'}`);
     }
 
     return { 
       script, 
-      videoUrl: videoResult.value, 
+      imageUrl: imageResult.value, 
       audioUrl: audioResult.value 
     };
 
