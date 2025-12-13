@@ -75,10 +75,24 @@ export default function Home() {
     form.reset();
   }
 
-  if (isUserLoading) {
+  if (isUserLoading || loadingState === 'generating') {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
-        <p>Loading...</p>
+        {loadingState === 'generating' ? (
+          <>
+            <Image 
+                src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
+                alt="Now Loading..."
+                width={300}
+                height={300}
+                unoptimized
+            />
+            <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
+            <p className="mt-2 text-sm text-gray-400 font-mono text-center">This can take up to a minute...</p>
+          </>
+        ) : (
+           <p>Loading...</p>
+        )}
       </main>
     );
   }
@@ -91,22 +105,6 @@ export default function Home() {
         videoUrl={generationResult.videoUrl}
         onReset={resetApp}
       />
-    );
-  }
-  
-  if (loadingState === 'generating') {
-    return (
-      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
-        <Image 
-            src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
-            alt="Now Loading..."
-            width={300}
-            height={300}
-            unoptimized
-        />
-        <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-        <p className="mt-2 text-sm text-gray-400 font-mono text-center">This can take up to a minute...</p>
-      </main>
     );
   }
 
@@ -142,14 +140,14 @@ export default function Home() {
                           className="resize-none bg-white/50 text-base text-gray-800"
                           rows={3}
                           {...field}
-                          disabled={loadingState !== 'idle' || isUserLoading}
+                          disabled={loadingState !== 'idle'}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={loadingState !== 'idle' || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
+                <Button type="submit" disabled={loadingState !== 'idle'} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
                    {loadingState !== 'idle' ? 'Generating...' : 'ROT IT!'}
                 </Button>
               </form>
