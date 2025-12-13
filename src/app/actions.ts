@@ -89,7 +89,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
     }
 
     if (videoOperation.error) {
-        console.error('Video generation operation failed:', videoOperation.error);
         throw new Error(`Video generation failed: ${videoOperation.error.message}`);
     }
 
@@ -131,7 +130,6 @@ async function generateVideoSequence(script: string): Promise<string[]> {
         }
 
         if (videoOperation.error) {
-            console.error(`Video clip generation failed for sentence: "${sentence}"`, videoOperation.error);
             throw new Error(`Failed to generate a video clip: ${videoOperation.error.message}`);
         }
 
@@ -163,7 +161,6 @@ async function generateImageSequence(script: string): Promise<string[]> {
     
     return imageResponses.map((response, index) => {
         if (!response.media?.url) {
-            console.error(`Failed to generate image for sentence: "${sentences[index]}"`);
             // Return a placeholder or handle the error as needed
             return "https://placehold.co/540x960/black/white?text=Error";
         }
