@@ -40,15 +40,10 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    const newMutedState = !video.muted;
-    video.muted = newMutedState;
-    setIsMuted(newMutedState);
-
-    // If we are unmuting and the video is paused, play it.
-    // This helps start playback on browsers that block autoplay.
-    if (!newMutedState && video.paused) {
-      video.play().catch(e => console.error("Could not play video on unmute.", e));
-    }
+    // This component only displays a silent video, so this button is a dummy button.
+    // In a real scenario, you'd toggle video.muted
+    setIsMuted(!isMuted); 
+    
   };
   
   const handleMediaMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {

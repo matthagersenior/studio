@@ -43,11 +43,15 @@ async function generateInitialImage(prompt: string): Promise<string> {
 
 async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
     let videoOperation = (await ai.generate({
-        model: 'googleai/veo-3.0-generate-preview',
+        model: 'googleai/veo-2.0-generate-001',
         prompt: [
-            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. Include a dramatic, high-energy voiceover narrating the script. Script: ${script}` },
+            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. This will be a silent video. Script: ${script}` },
             { media: { url: imageUri, contentType: 'image/jpeg' } }
         ],
+        config: {
+          durationSeconds: 5,
+          aspectRatio: '9:16'
+        }
     })).operation;
 
     if (!videoOperation) {
@@ -99,7 +103,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     
     if (errorMessage.includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
-    } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
+    } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
     }
     
