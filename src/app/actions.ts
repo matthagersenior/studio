@@ -60,7 +60,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
     }
 
     while (!videoOperation.done) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); 
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Increase wait time
         videoOperation = await ai.checkOperation(videoOperation);
     }
 
@@ -73,7 +73,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         throw new Error('Failed to find the generated video in the operation result.');
     }
     
-    // The media URL is a temporary download link, we need to fetch it and convert to a data URI
     const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
 
     if (!videoDownloadResponse.ok) {
@@ -123,13 +122,11 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    // Generate video and audio in parallel
-    const [initialImage, audioUrl] = await Promise.all([
-        generateInitialImage(prompt),
-        generateVoiceover(script)
-    ]);
+    const initialImage = await generateInitialImage(prompt);
     
     const videoUrl = await generateVideoFromImage(script, initialImage);
+    
+    const audioUrl = await generateVoiceover(script);
 
     return { script, videoUrl, audioUrl };
 

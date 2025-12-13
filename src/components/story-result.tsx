@@ -76,14 +76,14 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
         audio.removeAttribute('src');
       }
     };
-  }, [videoUrl, audioUrl, isMuted]);
+  }, [videoUrl, audioUrl]);
 
 
   const handleMuteToggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
     
-    const newMutedState = !isMuted;
+    const newMutedState = !audio.muted;
     setIsMuted(newMutedState);
     audio.muted = newMutedState;
 
