@@ -42,7 +42,6 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
         if(video) {
             video.pause();
             video.removeAttribute('src'); // Free up memory
-            video.load();
         }
     };
   }, [videoUrl]);
