@@ -15,8 +15,7 @@ import { StoryResult } from "@/components/story-result";
 import Image from 'next/image';
 import type { StoryResultPayload } from "@/app/actions";
 import { useUser, useAuth } from '@/firebase';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
+import { signInAnonymously } from 'firebase/auth';
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
@@ -30,13 +29,19 @@ export default function Home() {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
+    if (!isUserLoading && !user && auth) {
+      signInAnonymously(auth).catch((error) => {
+        console.error("Anonymous sign-in failed:", error);
+         toast({
+            variant: "destructive",
+            title: "Authentication Failed",
+            description: "Could not start an anonymous session. Please try refreshing the page.",
+         });
+      });
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, auth, toast]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,6 +51,14 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Not Signed In",
+            description: "You need to be signed in to generate a story. Please refresh the page.",
+        });
+        return;
+    }
     setLoadingState('generating');
     setGenerationResult(null);
 
@@ -70,14 +83,7 @@ export default function Home() {
     form.reset();
   }
 
-  async function handleLogout() {
-    if (auth) {
-      await signOut(auth);
-      router.push('/login');
-    }
-  }
-
-  if (isUserLoading || !user) {
+  if (isUserLoading) {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         <p>Loading...</p>
@@ -114,13 +120,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
-       {user && (
-        <div className="absolute top-4 right-4">
-          <Button onClick={handleLogout} variant="ghost" className="text-white/70 hover:text-white">
-            Log Out
-          </Button>
-        </div>
-      )}
       <div className="max-w-4xl mx-auto space-y-8 w-full">
         <header className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">
@@ -151,14 +150,14 @@ export default function Home() {
                           className="resize-none bg-white/50 text-base text-gray-800"
                           rows={3}
                           {...field}
-                          disabled={loadingState !== 'idle'}
+                          disabled={loadingState !== 'idle' || !user}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={loadingState !== 'idle'} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
+                <Button type="submit" disabled={loadingState !== 'idle' || !user} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
                    {loadingState !== 'idle' ? 'Generating...' : 'ROT IT!'}
                 </Button>
               </form>
