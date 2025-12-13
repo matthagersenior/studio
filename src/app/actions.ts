@@ -121,7 +121,7 @@ async function generateVideoSequence(script: string): Promise<string[]> {
             model: 'googleai/veo-2.0-generate-001',
             prompt: `Create a short, surreal, and chaotic video clip for the following line: "${sentence}"`,
             config: {
-                aspectRatio: '9:16',
+                // aspectRatio was removed here as it's not supported for text-to-video with Veo
             },
         })).operation;
 
@@ -221,7 +221,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
-    } else if (errorMessage.includes('durationSeconds')) {
+    } else if (errorMessage.includes('durationSeconds') || errorMessage.includes('aspectRatio')) {
         errorMessage = "There was an internal issue with the video generation parameters. Please try again.";
     }
     
