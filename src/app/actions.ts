@@ -2,8 +2,6 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
-import { toWav } from "@/lib/wav-converter";
-import fetch from 'node-fetch';
 
 export type StoryResultPayload = {
   script: string;
@@ -29,7 +27,7 @@ async function generateScript(prompt: string): Promise<string> {
 
 async function generateVideoWithSound(prompt: string): Promise<string> {
     let { operation } = await ai.generate({
-      model: ai.model('veo-2.0-generate-001'),
+      model: 'googleai/veo-2.0-generate-001',
       prompt: `Create a cinematic, surreal, and meme-worthy video based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd. Use a 9:16 aspect ratio. The video should have an epic, orchestral, slightly off-key background music track.`,
       config: {
         durationSeconds: 5,
@@ -66,7 +64,6 @@ async function generateVideoWithSound(prompt: string): Promise<string> {
     }
 
     // The URL from VEO is temporary and needs to be fetched and re-encoded.
-    // NOTE: This requires node-fetch to be installed.
     const fetch = (await import('node-fetch')).default;
     const videoDownloadResponse = await fetch(
         `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
