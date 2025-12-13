@@ -68,8 +68,6 @@ async function generateInitialImage(prompt: string): Promise<string> {
 
 
 async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
-    const estimatedDuration = Math.max(5, Math.min(8, Math.round(script.split(' ').length / 2.5)));
-    
     let videoOperation = (await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: [
@@ -77,7 +75,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
             { media: { url: imageUri, contentType: 'image/png' } }
         ],
         config: {
-            durationSeconds: estimatedDuration,
+            durationSeconds: 4, // CRITICAL FIX: Image animation requires a duration of 4 seconds.
         },
     })).operation;
 
