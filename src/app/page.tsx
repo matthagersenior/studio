@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +14,9 @@ import { generateStory } from "@/app/actions";
 import { StoryResult } from "@/components/story-result";
 import Image from 'next/image';
 import type { StoryResultPayload } from "@/app/actions";
+import { useUser, useAuth } from '@/firebase';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
@@ -24,6 +28,15 @@ export default function Home() {
   const [generationResult, setGenerationResult] = useState<StoryResultPayload | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -56,15 +69,28 @@ export default function Home() {
     setLoadingState('idle');
     form.reset();
   }
-  
+
+  async function handleLogout() {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
+  }
+
+  if (isUserLoading || !user) {
+    return (
+      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
+        <p>Loading...</p>
+      </main>
+    );
+  }
+
   if (generationResult) {
     return (
       <StoryResult
         script={generationResult.script}
         audioUrl={generationResult.audioUrl}
         videoUrl={generationResult.videoUrl}
-        videoUrls={generationResult.videoUrls}
-        imageUrls={generationResult.imageUrls}
         onReset={resetApp}
       />
     );
@@ -88,6 +114,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
+       {user && (
+        <div className="absolute top-4 right-4">
+          <Button onClick={handleLogout} variant="ghost" className="text-white/70 hover:text-white">
+            Log Out
+          </Button>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto space-y-8 w-full">
         <header className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">

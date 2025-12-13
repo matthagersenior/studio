@@ -1,3 +1,4 @@
+
 'use server';
 
 import { ai } from "@/ai/genkit";
@@ -8,8 +9,6 @@ export type StoryResultPayload = {
   script: string;
   audioUrl: string;
   videoUrl?: string;
-  videoUrls?: string[]; // Kept for type compatibility but won't be populated
-  imageUrls?: string[]; // Kept for type compatibility but won't be populated
   error?: never;
 };
 
@@ -124,14 +123,13 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     return { script, audioUrl, videoUrl };
 
   } catch (e: any) {
+    console.error("Full error in generateStory:", e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
     
     if (errorMessage.includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
-    } else if (errorMessage.includes('durationSeconds') || errorMessage.includes('aspectRatio') || errorMessage.includes('contentType')) {
-        errorMessage = "There was an internal issue with the video generation parameters. Please try again.";
     }
     
     return { error: errorMessage };

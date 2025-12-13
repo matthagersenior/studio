@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, RefObject } from 'react';
@@ -9,26 +10,30 @@ interface KaraokeScriptProps {
   mediaDuration: number;
 }
 
-// Estimate words per second for a more natural pace
-const WORDS_PER_SECOND = 2.5;
-
 export function KaraokeScript({ script, mediaRef, mediaDuration }: KaraokeScriptProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
-  const words = useMemo(() => script.split(/\s+/).filter(w => w.length > 0), [script]);
+  const words = useMemo(() => {
+    return script.split(/\s+/).filter(w => w.length > 0).map((word, index) => ({
+      word,
+      id: `${word}-${index}`
+    }));
+  }, [script]);
   
   const timestamps = useMemo(() => {
     if (!mediaDuration || words.length === 0) return [];
     
-    // Calculate total character length to distribute time more effectively
-    const totalChars = words.reduce((acc, word) => acc + word.length, 0);
-    const averageTimePerChar = mediaDuration / totalChars;
+    // Total "units" = total characters + number of words (for spaces)
+    const totalChars = words.reduce((acc, w) => acc + w.word.length, 0);
+    const totalUnits = totalChars + words.length -1;
+    const timePerUnit = mediaDuration / totalUnits;
     
     let accumulatedTime = 0;
-    return words.map((word) => {
-      const estimatedWordDuration = word.length * averageTimePerChar + 0.1; // Add small buffer
+    return words.map(({ word }) => {
       const startTime = accumulatedTime;
-      accumulatedTime += estimatedWordDuration;
+      // duration is based on characters + 1 unit for the following space
+      const wordDuration = (word.length + 1) * timePerUnit;
+      accumulatedTime += wordDuration;
       const endTime = accumulatedTime;
       return { startTime, endTime };
     });
@@ -57,13 +62,13 @@ export function KaraokeScript({ script, mediaRef, mediaDuration }: KaraokeScript
   return (
     <ScrollArea className="max-h-48 md:max-h-full">
       <div className="whitespace-pre-wrap">
-        {words.map((word, index) => {
+        {words.map(({ word, id }, index) => {
           const ts = timestamps[index];
           const isSpeaking = ts && currentTime >= ts.startTime && currentTime < ts.endTime;
           
           return (
             <span
-              key={index}
+              key={id}
               className={`transition-all duration-150 ease-in-out ${
                 isSpeaking ? 'text-yellow-300 scale-105 font-bold inline-block' : 'text-white/80'
               }`}
