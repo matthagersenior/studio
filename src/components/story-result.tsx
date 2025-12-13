@@ -21,48 +21,53 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
   const [currentVisualIndex, setCurrentVisualIndex] = useState(0);
   
   const [isMuted, setIsMuted] = useState(true);
-  const [audioDuration, setAudioDuration] = useState(0);
+  const [mediaDuration, setMediaDuration] = useState(0);
 
   const allVideos = videoUrl ? [videoUrl] : videoUrls || [];
   const isImageSequence = imageUrls && imageUrls.length > 0;
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    const video = videoRef.current;
+    if (!audio || !video) return;
 
+    // Set sources
     audio.src = audioUrl;
+    if (allVideos.length > 0) {
+      video.src = allVideos[0];
+    }
+    
+    // Mute/unmute based on state
     audio.muted = isMuted;
+    video.muted = isMuted;
 
     const playMedia = async () => {
       try {
-        // Unmute before playing to ensure Safari plays audio with video
-        if (videoRef.current) {
-          videoRef.current.muted = false; 
-        }
+        await video.play();
         await audio.play();
-        if (videoRef.current) {
-          videoRef.current.play();
-        }
       } catch (e) {
-        console.error("Autoplay was prevented. User interaction needed.", e);
-        setIsMuted(true); 
-         if (videoRef.current) {
-          videoRef.current.muted = true;
-        }
+        console.error("Autoplay was prevented. User must interact.", e);
+        setIsMuted(true);
+        video.muted = true;
+        audio.muted = true;
       }
     };
     
-    // Delay play to allow media to load
-    const timer = setTimeout(playMedia, 100);
+    // Delay play slightly to ensure media is ready
+    const timer = setTimeout(playMedia, 150);
 
+    const handleVideoTimeUpdate = () => {
+      if (audio.paused && video.currentTime > 0) {
+        audio.currentTime = video.currentTime;
+        audio.play().catch(e => console.error("Audio sync play failed", e));
+      }
 
-    const handleTimeUpdate = () => {
-      if (!audioDuration) return;
+      if (!mediaDuration) return;
 
       const visualAssets = isImageSequence ? imageUrls : allVideos;
       if (!visualAssets || visualAssets.length <= 1) return;
 
-      const progress = audio.currentTime / audioDuration;
+      const progress = video.currentTime / mediaDuration;
       const newIndex = Math.floor(progress * visualAssets.length);
       
       if (newIndex !== currentVisualIndex) {
@@ -70,26 +75,29 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
       }
     };
 
-    audio.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('timeupdate', handleVideoTimeUpdate);
     
     return () => {
       clearTimeout(timer);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('timeupdate', handleVideoTimeUpdate);
     };
 
-  }, [audioUrl, isMuted, allVideos, imageUrls, isImageSequence, audioDuration, currentVisualIndex]);
+  }, [audioUrl, isMuted, allVideos, imageUrls, isImageSequence, mediaDuration, currentVisualIndex]);
 
 
   useEffect(() => {
     const video = videoRef.current;
+    const audio = audioRef.current;
     if (video && allVideos[currentVisualIndex]) {
-        // If the source is different, update and play
         if (video.currentSrc !== allVideos[currentVisualIndex]) {
+            const currentTime = video.currentTime;
             video.src = allVideos[currentVisualIndex];
-            video.load(); // Important for changing source
-            video.play().catch(e => console.error("Could not play video clip.", e));
+            video.load();
+            video.play().then(() => {
+              video.currentTime = currentTime;
+              if (audio) audio.currentTime = currentTime;
+            }).catch(e => console.error("Could not play video clip.", e));
         } else if (video.paused) {
-            // If same source but paused (e.g., after seeking), play it
             video.play().catch(e => console.error("Could not resume video clip.", e));
         }
     }
@@ -103,16 +111,18 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
       audioRef.current.muted = newMutedState;
     }
     if (videoRef.current) {
-        videoRef.current.muted = newMutedState;
+      videoRef.current.muted = newMutedState;
     }
-     if (audioRef.current && !newMutedState && audioRef.current.paused) {
-        audioRef.current.play().catch(e => console.error("Could not play audio on unmute.", e));
+     if (videoRef.current && !newMutedState && videoRef.current.paused) {
+        videoRef.current.play().catch(e => console.error("Could not play video on unmute.", e));
       }
   };
   
-  const handleAudioMetadata = () => {
-    if (audioRef.current) {
-      setAudioDuration(audioRef.current.duration);
+  const handleMediaMetadata = (e: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
+    // Use the longer of the two durations
+    const newDuration = e.currentTarget.duration;
+    if (newDuration > mediaDuration) {
+      setMediaDuration(newDuration);
     }
   };
 
@@ -136,13 +146,19 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
        return (
         <video
           ref={videoRef}
-          key={allVideos[currentVisualIndex]}
+          key={allVideos[0]} // Key stays consistent
           className="absolute top-0 left-0 w-full h-full object-cover"
           loop={isLoopingVideo}
-          muted={isMuted} // Sync with the central mute state
+          muted={isMuted}
           playsInline
           autoPlay
-          src={allVideos[currentVisualIndex]} // Set initial src
+          onLoadedMetadata={handleMediaMetadata}
+          onEnded={() => {
+              if (!isLoopingVideo && !isImageSequence) {
+                  setCurrentVisualIndex(0);
+              }
+          }}
+          src={allVideos[0]}
         />
       );
     }
@@ -151,44 +167,41 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
   };
 
   return (
-    <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
+    <div className="w-screen h-screen bg-black flex items-center justify-center p-0 md:p-4">
       <audio
         ref={audioRef}
         src={audioUrl}
         loop={isLoopingVideo || (isImageSequence && imageUrls && imageUrls.length > 0)}
         playsInline
         muted={isMuted}
-        onLoadedMetadata={handleAudioMetadata}
-        onEnded={() => {
-            if (!isLoopingVideo && !isImageSequence) {
-                // Logic for when a sequence of videos ends
-                setCurrentVisualIndex(0); // Optional: Reset to beginning
-            }
-        }}
+        onLoadedMetadata={handleMediaMetadata}
       />
-      <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
-        <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">
+      <div className="w-full h-full flex flex-col md:aspect-[9/16] md:h-auto md:max-h-full md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
+        <div className="relative w-full flex-1 md:flex-none aspect-[9/16] bg-black">
           {renderVisuals()}
+
+          {/* Overlay Container */}
+          <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+             <div
+              className="w-full text-center text-white font-semibold text-lg"
+              style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
+            >
+              <KaraokeScript
+                script={script}
+                mediaRef={videoRef} 
+                mediaDuration={mediaDuration}
+              />
+            </div>
+          </div>
+
+          <div className="absolute top-4 right-4 z-10">
+            <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
+              {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            </Button>
+          </div>
         </div>
 
-        <div
-          className="w-full text-center text-white font-semibold text-lg p-4 flex-grow min-h-0 md:absolute md:bottom-0 md:left-0 md:right-0 md:p-8 md:bg-gradient-to-t md:from-black/80 md:to-transparent md:flex-grow-0 md:min-h-0"
-          style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
-        >
-          <KaraokeScript
-            script={script}
-            mediaRef={audioRef}
-            mediaDuration={audioDuration}
-          />
-        </div>
-
-        <div className="absolute top-4 right-4 z-10">
-          <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </Button>
-        </div>
-
-        <div className="text-center py-2 md:absolute md:bottom-4 md:right-4 md:py-0 z-10">
+        <div className="text-center py-2 bg-black md:bg-transparent md:absolute md:bottom-4 md:right-4 md:py-0 z-10">
           <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
             ROTTEN ENOUGH
           </Button>
