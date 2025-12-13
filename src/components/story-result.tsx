@@ -35,6 +35,10 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
 
     const playMedia = async () => {
       try {
+        // Unmute before playing to ensure Safari plays audio with video
+        if (videoRef.current) {
+          videoRef.current.muted = false; 
+        }
         await audio.play();
         if (videoRef.current) {
           videoRef.current.play();
@@ -42,9 +46,15 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
       } catch (e) {
         console.error("Autoplay was prevented. User interaction needed.", e);
         setIsMuted(true); 
+         if (videoRef.current) {
+          videoRef.current.muted = true;
+        }
       }
     };
-    playMedia();
+    
+    // Delay play to allow media to load
+    const timer = setTimeout(playMedia, 100);
+
 
     const handleTimeUpdate = () => {
       if (!audioDuration) return;
@@ -63,27 +73,41 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     
     return () => {
+      clearTimeout(timer);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
 
   }, [audioUrl, isMuted, allVideos, imageUrls, isImageSequence, audioDuration, currentVisualIndex]);
 
+
   useEffect(() => {
-    if (videoRef.current && allVideos[currentVisualIndex]) {
-      videoRef.current.src = allVideos[currentVisualIndex];
-      videoRef.current.play().catch(e => console.error("Could not play video clip.", e));
+    const video = videoRef.current;
+    if (video && allVideos[currentVisualIndex]) {
+        // If the source is different, update and play
+        if (video.currentSrc !== allVideos[currentVisualIndex]) {
+            video.src = allVideos[currentVisualIndex];
+            video.load(); // Important for changing source
+            video.play().catch(e => console.error("Could not play video clip.", e));
+        } else if (video.paused) {
+            // If same source but paused (e.g., after seeking), play it
+            video.play().catch(e => console.error("Could not resume video clip.", e));
+        }
     }
   }, [currentVisualIndex, allVideos]);
+
 
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
     if (audioRef.current) {
       audioRef.current.muted = newMutedState;
-      if (!newMutedState && audioRef.current.paused) {
+    }
+    if (videoRef.current) {
+        videoRef.current.muted = newMutedState;
+    }
+     if (audioRef.current && !newMutedState && audioRef.current.paused) {
         audioRef.current.play().catch(e => console.error("Could not play audio on unmute.", e));
       }
-    }
   };
   
   const handleAudioMetadata = () => {
@@ -95,7 +119,7 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
   const isLoopingVideo = allVideos.length === 1;
 
   const renderVisuals = () => {
-    if (isImageSequence) {
+    if (isImageSequence && imageUrls) {
       return (
         <Image
           key={imageUrls[currentVisualIndex]}
@@ -115,9 +139,10 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
           key={allVideos[currentVisualIndex]}
           className="absolute top-0 left-0 w-full h-full object-cover"
           loop={isLoopingVideo}
-          muted
+          muted={isMuted} // Sync with the central mute state
           playsInline
           autoPlay
+          src={allVideos[currentVisualIndex]} // Set initial src
         />
       );
     }
@@ -130,10 +155,16 @@ export function StoryResult({ script, audioUrl, videoUrl, videoUrls, imageUrls, 
       <audio
         ref={audioRef}
         src={audioUrl}
-        loop={isLoopingVideo || isImageSequence}
+        loop={isLoopingVideo || (isImageSequence && imageUrls && imageUrls.length > 0)}
         playsInline
         muted={isMuted}
         onLoadedMetadata={handleAudioMetadata}
+        onEnded={() => {
+            if (!isLoopingVideo && !isImageSequence) {
+                // Logic for when a sequence of videos ends
+                setCurrentVisualIndex(0); // Optional: Reset to beginning
+            }
+        }}
       />
       <div className="w-full max-w-sm h-full flex flex-col md:aspect-[9/16] md:h-auto md:relative md:rounded-xl md:overflow-hidden md:shadow-2xl md:shadow-primary/20 md:border md:border-primary/20">
         <div className="relative w-full aspect-[9/16] md:h-full rounded-lg overflow-hidden shrink-0 bg-black">

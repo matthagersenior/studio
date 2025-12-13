@@ -100,12 +100,25 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         throw new Error('Failed to find the generated video in the operation result.');
     }
     
-    return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+    // The media URL is a temporary download link, we need to fetch it and convert to a data URI
+    const fetch = (await import('node-fetch')).default;
+    const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
+
+    if (!videoDownloadResponse.ok) {
+        throw new Error(`Failed to download video: ${videoDownloadResponse.statusText}`);
+    }
+
+    const videoBuffer = await videoDownloadResponse.arrayBuffer();
+    const videoBase64 = Buffer.from(videoBuffer).toString('base64');
+
+    return `data:video/mp4;base64,${videoBase64}`;
 }
+
 
 async function generateVideoSequence(script: string): Promise<string[]> {
     console.log("Fallback 1: Generating video sequence.");
     const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    
     const videoClipPromises = sentences.map(async (sentence) => {
         let videoOperation = (await ai.generate({
             model: 'googleai/veo-2.0-generate-001',
@@ -135,11 +148,16 @@ async function generateVideoSequence(script: string): Promise<string[]> {
             throw new Error('Failed to find the generated video clip.');
         }
         
-        return `${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`;
+        const fetch = (await import('node-fetch')).default;
+        const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
+        if (!videoDownloadResponse.ok) throw new Error('Failed to download video clip');
+        const videoBuffer = await videoDownloadResponse.arrayBuffer();
+        return `data:video/mp4;base64,${Buffer.from(videoBuffer).toString('base64')}`;
     });
 
     return Promise.all(videoClipPromises);
 }
+
 
 async function generateImageSequence(script: string): Promise<string[]> {
     console.log("Fallback 2: Generating image sequence.");
