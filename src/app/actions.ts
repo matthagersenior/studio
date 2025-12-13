@@ -148,7 +148,7 @@ async function generateVideoSequence(script: string): Promise<string[]> {
         }
         
         const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
-        if (!videoDownloadResponse.ok) throw new Error('Failed to download video clip');
+        if (!videoDownloadResponse.ok) throw new Error(`Failed to download video clip: ${videoDownloadResponse.statusText}`);
         const videoBuffer = await videoDownloadResponse.arrayBuffer();
         return `data:video/mp4;base64,${Buffer.from(videoBuffer).toString('base64')}`;
     });
