@@ -72,7 +72,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         model: 'googleai/veo-2.0-generate-001',
         prompt: [
             { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. Script: ${script}` },
-            { media: { url: imageUri, contentType: 'image/png' } }
+            { media: { url: imageUri, contentType: 'image/jpeg' } }
         ],
         config: {
             durationSeconds: 5, 
@@ -218,7 +218,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
-    } else if (errorMessage.includes('durationSeconds') || errorMessage.includes('aspectRatio')) {
+    } else if (errorMessage.includes('durationSeconds') || errorMessage.includes('aspectRatio') || errorMessage.includes('contentType')) {
         errorMessage = "There was an internal issue with the video generation parameters. Please try again.";
     }
     
