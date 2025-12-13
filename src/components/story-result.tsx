@@ -61,9 +61,20 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     const audio = audioRef.current;
     if (!video || !audio) return;
     
-    video.play().catch(e => console.error("Video play failed:", e));
-    audio.play().catch(e => console.error("Audio play failed:", e));
-    setIsPlaying(true);
+    // Ensure video is unmuted if we are unmuting audio, but keep it visually muted in the tag
+    if (audio) audio.muted = false;
+
+    const videoPromise = video.play();
+    const audioPromise = audio.play();
+
+    Promise.all([videoPromise, audioPromise]).then(() => {
+        setIsPlaying(true);
+    }).catch(e => {
+        console.error("Media play failed:", e);
+        // On some browsers, autoplay is blocked. User must interact.
+        // We will set playing to false, and the next click will try again.
+        setIsPlaying(false);
+    });
   };
 
   const pauseMedia = () => {
@@ -80,21 +91,16 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     if (isPlaying) {
       pauseMedia();
     } else {
-      // Unmute and play if it's the first interaction
-      if (isMuted) {
-        handleMuteToggle(false); // Unmute
-      }
       playMedia();
     }
   };
   
-  const handleMuteToggle = (currentlyMuted: boolean) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    const newMutedState = !currentlyMuted;
+  const handleMuteToggle = () => {
+    const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    audio.muted = newMutedState;
+    if(audioRef.current) {
+        audioRef.current.muted = newMutedState;
+    }
 
     // If unmuting for the first time, try to play
     if (!newMutedState && !isPlaying) {
@@ -111,13 +117,13 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
             ref={videoRef}
             src={videoUrl}
             playsInline
-            loop // The video itself should loop
+            loop // The visual part should loop
             muted // Video is always muted, audio is handled by the separate audio element
             className="w-full h-full object-cover"
           />
         )}
         
-        <audio ref={audioRef} muted={isMuted} loop />
+        {audioUrl && <audio ref={audioRef} loop />}
 
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
@@ -139,7 +145,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 flex justify-center items-center z-10 space-x-4">
-          <Button onClick={() => handleMuteToggle(isMuted)} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
+          <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
             {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </Button>
           <Button onClick={handlePlayPauseToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12">

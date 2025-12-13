@@ -8,7 +8,7 @@ export type StoryResultPayload = {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
-  imageUrl?: string; // Keep imageUrl for context if needed, though video is primary
+  imageUrl?: string;
   error?: never;
 };
 
@@ -41,22 +41,53 @@ async function generateInitialImage(prompt: string): Promise<string> {
 }
 
 async function generateVideoFromImage(imageUrl: string, script: string): Promise<string> {
-    const { media } = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-image-preview',
+    const { operation } = await ai.generate({
+        model: 'googleai/veo-2.0-generate-001',
         prompt: [
             { text: `Animate this image in a short, looping, chaotic, meme-worthy style. The animation should reflect the absurd energy of the following script: ${script}` },
             { media: { url: imageUrl, contentType: 'image/png' } },
         ],
-        config: {
-            responseModalities: ['IMAGE'], // We expect an image/video back
+         config: {
+            durationSeconds: 5,
+            aspectRatio: '9:16',
         },
     });
 
-    if (!media?.url) {
-      throw new Error('Generated video content could not be found.');
+    if (!operation) {
+        throw new Error('Video generation operation did not start.');
+    }
+    
+    let finalOperation = operation;
+    while (!finalOperation.done) {
+        // Wait for 5 seconds before checking the status again.
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        finalOperation = await ai.checkOperation(finalOperation);
+    }
+    
+    if (finalOperation.error) {
+        throw new Error(`Video generation failed: ${finalOperation.error.message}`);
+    }
+    
+    const video = finalOperation.output?.message?.content.find((p) => !!p.media);
+    if (!video?.media?.url) {
+        throw new Error('Generated video content could not be found.');
     }
 
-    return media.url;
+    // The URL from Veo is temporary and needs the API key to be accessed.
+    // We will fetch it server-side and convert it to a data URI to send to the client.
+    const fetch = (await import('node-fetch')).default;
+    const videoDownloadResponse = await fetch(
+        `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
+    );
+
+    if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
+        throw new Error(`Failed to download generated video (status: ${videoDownloadResponse.status})`);
+    }
+
+    const videoBuffer = await videoDownloadResponse.buffer();
+    const contentType = video.media.contentType || 'video/mp4';
+
+    return `data:${contentType};base64,${videoBuffer.toString('base64')}`;
 }
 
 
@@ -115,8 +146,8 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
     return { 
       script,
-      imageUrl, // Pass the original image through
-      videoUrl: videoResult.value, // This will be the animated video/gif
+      imageUrl, // Pass the original image through for context
+      videoUrl: videoResult.value,
       audioUrl: audioResult.value,
     };
 
@@ -126,10 +157,12 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     
     if (String(e.message).includes('404')) {
       errorMessage = 'An underlying AI model is currently unavailable. Please try again later.';
-    } else if (errorMessage.includes('safety policies')) {
+    } else if (String(e.message).includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
-    } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted')) {
+    } else if (String(e.message).includes('429') || String(e.message).includes('Too Many Requests') || String(e.message).includes('quota') || String(e.message).includes('resource has been exhausted')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
+    } else if (String(e.message).includes('INVALID_ARGUMENT')) {
+        errorMessage = `A technical error occurred during generation: ${e.message}`;
     }
     
     return { error: errorMessage };
