@@ -124,11 +124,25 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     
     const initialImage = await generateInitialImage(prompt);
     
-    const videoUrl = await generateVideoFromImage(script, initialImage);
-    
-    const audioUrl = await generateVoiceover(script);
+    // Run video and audio generation in parallel
+    const [videoResult, audioResult] = await Promise.allSettled([
+      generateVideoFromImage(script, initialImage),
+      generateVoiceover(script),
+    ]);
 
-    return { script, videoUrl, audioUrl };
+    if (videoResult.status === 'rejected') {
+      throw new Error(`Video generation failed: ${videoResult.reason?.message || 'Unknown error'}`);
+    }
+    
+    if (audioResult.status === 'rejected') {
+      throw new Error(`Audio generation failed: ${audioResult.reason?.message || 'Unknown error'}`);
+    }
+
+    return { 
+      script, 
+      videoUrl: videoResult.value, 
+      audioUrl: audioResult.value 
+    };
 
   } catch (e: any) {
     console.error("Full error in generateStory:", e);
