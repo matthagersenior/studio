@@ -3,7 +3,6 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
-import { googleAI } from '@genkit-ai/google-genai';
 
 export type StoryResultPayload = {
   script: string;

@@ -5,6 +5,8 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  # Set the timeout for the server to 2 minutes to allow for video generation
+  timeoutSeconds: 120
 # This section makes secrets from Google Cloud Secret Manager available as
 # environment variables to your running application.
 secretEnvironmentVariables:
