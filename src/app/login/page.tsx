@@ -50,18 +50,11 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    // If user is logged in (and not anonymous), redirect to home
+    // If user is logged in, redirect to home
     if (!isUserLoading && user) {
         router.push('/');
     }
-    // If no user and not loading, try to sign in anonymously
-    else if (!isUserLoading && !user && auth) {
-        signInAnonymously(auth).catch((err) => {
-            console.error("Anonymous sign-in failed", err);
-            setError("Could not start a guest session. Please try again.");
-        });
-    }
-  }, [user, isUserLoading, auth, router]);
+  }, [user, isUserLoading, router]);
 
   const handleSignUp = async (values: z.infer<typeof signUpSchema>) => {
     if (!auth) return;
