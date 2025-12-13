@@ -30,7 +30,7 @@ async function generateScript(prompt: string): Promise<string> {
 async function generateInitialImage(prompt: string): Promise<string> {
     const { media } = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a cinematic, surreal, and meme-worthy still image based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd, suitable for a short video.`,
+        prompt: `Create a cinematic, surreal, and meme-worthy animated still image (like a GIF) based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd, suitable for a short video.`,
     });
 
     if (!media.url) {
