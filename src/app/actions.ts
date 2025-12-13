@@ -2,6 +2,7 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import fetch from 'node-fetch';
 
 export type StoryResultPayload = {
   script: string;
@@ -101,7 +102,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
     }
     
     // The media URL is a temporary download link, we need to fetch it and convert to a data URI
-    const fetch = (await import('node-fetch')).default;
     const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
 
     if (!videoDownloadResponse.ok) {
@@ -148,7 +148,6 @@ async function generateVideoSequence(script: string): Promise<string[]> {
             throw new Error('Failed to find the generated video clip.');
         }
         
-        const fetch = (await import('node-fetch')).default;
         const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
         if (!videoDownloadResponse.ok) throw new Error('Failed to download video clip');
         const videoBuffer = await videoDownloadResponse.arrayBuffer();
