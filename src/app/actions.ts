@@ -8,6 +8,7 @@ import fetch from 'node-fetch';
 export type StoryResultPayload = {
   script: string;
   videoUrl?: string;
+  audioUrl?: string;
   error?: never;
 };
 
@@ -86,6 +87,34 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
 }
 
 
+async function generateVoiceover(script: string): Promise<string> {
+  const { media } = await ai.generate({
+    model: 'googleai/gemini-2.5-flash-preview-tts',
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'Algenib' },
+        },
+      },
+    },
+    prompt: script,
+  });
+
+  if (!media?.url) {
+    throw new Error('Failed to generate voiceover.');
+  }
+
+  const audioBuffer = Buffer.from(
+    media.url.substring(media.url.indexOf(',') + 1),
+    'base64'
+  );
+  
+  const wavBase64 = await toWav(audioBuffer);
+  return `data:audio/wav;base64,${wavBase64}`;
+}
+
+
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -93,15 +122,24 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
   try {
     const script = await generateScript(prompt);
-    const initialImage = await generateInitialImage(prompt);
+    
+    // Generate video and audio in parallel
+    const [initialImage, audioUrl] = await Promise.all([
+        generateInitialImage(prompt),
+        generateVoiceover(script)
+    ]);
+    
     const videoUrl = await generateVideoFromImage(script, initialImage);
-    return { script, videoUrl };
+
+    return { script, videoUrl, audioUrl };
 
   } catch (e: any) {
     console.error("Full error in generateStory:", e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
     
-    if (errorMessage.includes('safety policies')) {
+    if (String(e.message).includes('404')) {
+      errorMessage = 'An underlying AI model is currently unavailable. Please try again later.';
+    } else if (errorMessage.includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";

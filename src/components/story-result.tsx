@@ -9,54 +9,88 @@ import { Volume2, VolumeX } from "lucide-react";
 interface StoryResultProps {
   script: string;
   videoUrl?: string;
+  audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // Effect to initialize the video
+  // Effect to initialize media and sync playback
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    const audio = audioRef.current;
 
+    if (!video || !audio || !videoUrl || !audioUrl) return;
+
+    // Set sources
     video.src = videoUrl;
-    video.muted = true;
+    audio.src = audioUrl;
+
+    // Mute video element, audio is controlled by the audio element
+    video.muted = true; 
     video.loop = true;
     video.playsInline = true;
 
-    // Attempt to play the video once it's ready
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(e => {
-            console.error("Video autoplay was prevented.", e);
-            // If autoplay is blocked, the user will need to interact to start.
-            // The mute/unmute button will serve this purpose.
-        });
-    }
+    audio.loop = true;
+    audio.muted = isMuted;
 
-    // Cleanup function to run when the component unmounts or videoUrl changes
-    return () => {
-        if(video) {
-            video.pause();
-            video.removeAttribute('src'); // Free up memory
+    const playMedia = () => {
+        // Play both, promises are handled
+        const videoPromise = video.play();
+        const audioPromise = audio.play();
+        
+        if (videoPromise !== undefined) {
+            videoPromise.catch(e => console.error("Video autoplay failed:", e));
+        }
+        if (audioPromise !== undefined) {
+            audioPromise.catch(e => console.error("Audio autoplay failed:", e));
         }
     };
-  }, [videoUrl]);
+    
+    // Sync logic
+    const syncTime = () => {
+        if (Math.abs(video.currentTime - audio.currentTime) > 0.1) {
+            audio.currentTime = video.currentTime;
+        }
+    };
+
+    video.addEventListener('play', playMedia);
+    video.addEventListener('timeupdate', syncTime);
+
+    playMedia();
+
+    // Cleanup function
+    return () => {
+      if (video) {
+        video.removeEventListener('play', playMedia);
+        video.removeEventListener('timeupdate', syncTime);
+        video.pause();
+        video.removeAttribute('src');
+      }
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute('src');
+      }
+    };
+  }, [videoUrl, audioUrl, isMuted]);
+
 
   const handleMuteToggle = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const newMutedState = !video.muted;
-    video.muted = newMutedState;
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const newMutedState = !isMuted;
     setIsMuted(newMutedState);
+    audio.muted = newMutedState;
 
-    // If we are unmuting, ensure the video is playing
-    if (!newMutedState && video.paused) {
-        video.play().catch(e => console.error("Could not play video on unmute:", e));
+    // If unmuting, might need to replay to satisfy browser policy
+    if (!newMutedState && (audio.paused || videoRef.current?.paused)) {
+        videoRef.current?.play().catch(e => console.error("Video play failed on unmute:", e));
+        audio.play().catch(e => console.error("Audio play failed on unmute:", e));
     }
   };
   
@@ -69,7 +103,7 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      {/* Aspect ratio container for mobile and desktop */}
+       <audio ref={audioRef} playsInline />
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         {videoUrl && (
             <video
@@ -83,7 +117,6 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
             />
         )}
 
-        {/* Overlay Container */}
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
             className="w-full text-center text-white font-semibold text-lg"
@@ -97,7 +130,6 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
           </div>
         </div>
 
-        {/* Controls Overlay */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10">
           <Button onClick={onReset} className="text-xs underline text-white/80 hover:text-white" variant="link">
               ROTTEN ENOUGH
