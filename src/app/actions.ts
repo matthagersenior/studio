@@ -78,7 +78,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
         ],
         config: {
             durationSeconds: estimatedDuration,
-            aspectRatio: '9:16',
         },
     })).operation;
 
