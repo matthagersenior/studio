@@ -24,7 +24,7 @@ const formSchema = z.object({
 type LoadingState = 'idle' | 'generating';
 
 export default function Home() {
-  const [generationResult, setGenerationResult] = useState<StoryResultPayload | null>(null);
+  const [generationResult, setGenerationResult] = useState<Omit<StoryResultPayload, 'error'> | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
@@ -75,7 +75,9 @@ export default function Home() {
     form.reset();
   }
 
-  if (isUserLoading || loadingState === 'generating') {
+  const isLoading = isUserLoading || loadingState === 'generating';
+
+  if (isLoading) {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         {loadingState === 'generating' ? (
@@ -101,7 +103,6 @@ export default function Home() {
     return (
       <StoryResult
         script={generationResult.script}
-        audioUrl={generationResult.audioUrl}
         videoUrl={generationResult.videoUrl}
         onReset={resetApp}
       />
@@ -147,7 +148,7 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={loadingState !== 'idle'} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
+                <Button type="submit" disabled={loadingState !== 'idle' || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
                    {loadingState !== 'idle' ? 'Generating...' : 'ROT IT!'}
                 </Button>
               </form>

@@ -8,7 +8,6 @@ import { Volume2, VolumeX } from "lucide-react";
 
 interface StoryResultProps {
   script: string;
-  audioUrl: string; // This will now be ignored, but we keep it to not break the action's return type yet.
   videoUrl?: string;
   onReset: () => void;
 }
@@ -41,7 +40,7 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    const newMutedState = !isMuted;
+    const newMutedState = !video.muted;
     video.muted = newMutedState;
     setIsMuted(newMutedState);
 
@@ -69,7 +68,8 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
               className="w-full h-full object-cover"
               playsInline
               loop
-              muted={isMuted} // Control mute state directly
+              muted
+              autoPlay
               onLoadedMetadata={handleMediaMetadata}
             />
         )}

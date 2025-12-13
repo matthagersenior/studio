@@ -7,7 +7,6 @@ import fetch from 'node-fetch';
 
 export type StoryResultPayload = {
   script: string;
-  audioUrl: string;
   videoUrl?: string;
   error?: never;
 };
@@ -29,30 +28,6 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateVoiceover(script: string): Promise<string> {
-  const voiceoverResult = await ai.generate({
-    model: 'googleai/gemini-2.5-flash-preview-tts',
-    prompt: script,
-    config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' },
-          },
-        },
-    },
-  });
-
-  if (!voiceoverResult.media?.url) {
-    throw new Error('The voiceover could not be generated.');
-  }
-  
-  const pcmData = Buffer.from(voiceoverResult.media.url.substring(voiceoverResult.media.url.indexOf(',') + 1), 'base64');
-  const wavData = await toWav(pcmData);
-  
-  return `data:audio/wav;base64,${wavData}`;
-}
-
 async function generateInitialImage(prompt: string): Promise<string> {
     const imageResponse = await ai.generate({
       model: 'googleai/imagen-4.0-fast-generate-001',
@@ -68,14 +43,11 @@ async function generateInitialImage(prompt: string): Promise<string> {
 
 async function generateVideoFromImage(script: string, imageUri: string): Promise<string> {
     let videoOperation = (await ai.generate({
-        model: 'googleai/veo-2.0-generate-001',
+        model: 'googleai/veo-3.0-generate-preview',
         prompt: [
-            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. Script: ${script}` },
+            { text: `Animate this image in a surreal, chaotic, and meme-worthy style based on the following script. The motion should be dramatic, continuous, and high-energy. Include a dramatic, high-energy voiceover narrating the script. Script: ${script}` },
             { media: { url: imageUri, contentType: 'image/jpeg' } }
         ],
-        config: {
-            durationSeconds: 5,
-        },
     })).operation;
 
     if (!videoOperation) {
@@ -117,10 +89,9 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
   try {
     const script = await generateScript(prompt);
-    const audioUrl = await generateVoiceover(script);
     const initialImage = await generateInitialImage(prompt);
     const videoUrl = await generateVideoFromImage(script, initialImage);
-    return { script, audioUrl, videoUrl };
+    return { script, videoUrl };
 
   } catch (e: any) {
     console.error("Full error in generateStory:", e);
