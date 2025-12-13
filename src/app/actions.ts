@@ -75,7 +75,7 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
             { media: { url: imageUri, contentType: 'image/png' } }
         ],
         config: {
-            durationSeconds: 4, 
+            durationSeconds: 5, 
         },
     })).operation;
 
@@ -120,9 +120,6 @@ async function generateVideoSequence(script: string): Promise<string[]> {
         let videoOperation = (await ai.generate({
             model: 'googleai/veo-2.0-generate-001',
             prompt: `Create a short, surreal, and chaotic video clip for the following line: "${sentence}"`,
-            config: {
-                // aspectRatio was removed here as it's not supported for text-to-video with Veo
-            },
         })).operation;
 
         if (!videoOperation) {
