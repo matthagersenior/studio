@@ -8,8 +8,8 @@ export type StoryResultPayload = {
   script: string;
   audioUrl: string;
   videoUrl?: string;
-  videoUrls?: string[];
-  imageUrls?: string[];
+  videoUrls?: string[]; // Kept for type compatibility but won't be populated
+  imageUrls?: string[]; // Kept for type compatibility but won't be populated
   error?: never;
 };
 
@@ -111,64 +111,6 @@ async function generateVideoFromImage(script: string, imageUri: string): Promise
 }
 
 
-async function generateVideoSequence(script: string): Promise<string[]> {
-    const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    
-    const videoClipPromises = sentences.map(async (sentence) => {
-        let videoOperation = (await ai.generate({
-            model: 'googleai/veo-2.0-generate-001',
-            prompt: `Create a short, surreal, and chaotic video clip for the following line: "${sentence}"`,
-        })).operation;
-
-        if (!videoOperation) {
-            throw new Error('Video sequence generation did not return an operation.');
-        }
-
-        while (!videoOperation.done) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            videoOperation = await ai.checkOperation(videoOperation);
-        }
-
-        if (videoOperation.error) {
-            throw new Error(`Failed to generate a video clip: ${videoOperation.error.message}`);
-        }
-
-        const videoPart = videoOperation.output?.message?.content.find(p => !!p.media);
-        if (!videoPart || !videoPart.media?.url) {
-            throw new Error('Failed to find the generated video clip.');
-        }
-        
-        const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${process.env.GEMINI_API_KEY}`);
-        if (!videoDownloadResponse.ok) throw new Error(`Failed to download video clip: ${videoDownloadResponse.statusText}`);
-        const videoBuffer = await videoDownloadResponse.arrayBuffer();
-        return `data:video/mp4;base64,${Buffer.from(videoBuffer).toString('base64')}`;
-    });
-
-    return Promise.all(videoClipPromises);
-}
-
-
-async function generateImageSequence(script: string): Promise<string[]> {
-    const sentences = script.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const imagePromises = sentences.map(sentence => 
-        ai.generate({
-            model: 'googleai/imagen-4.0-fast-generate-001',
-            prompt: `Create a cinematic, surreal, and meme-worthy image for the following line: "${sentence}". Style: dramatic, high-energy, absurd. 9:16 aspect ratio.`,
-        })
-    );
-
-    const imageResponses = await Promise.all(imagePromises);
-    
-    return imageResponses.map((response, index) => {
-        if (!response.media?.url) {
-            // Return a placeholder or handle the error as needed
-            return "https://placehold.co/540x960/black/white?text=Error";
-        }
-        return response.media.url;
-    });
-}
-
-
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -177,33 +119,11 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     const audioUrl = await generateVoiceover(script);
-    
-    try {
-      const initialImage = await generateInitialImage(prompt);
-      const videoUrl = await generateVideoFromImage(script, initialImage);
-      return { script, audioUrl, videoUrl };
-    } catch (primaryError: any) {
-        const isRateLimitError = (msg: string) => msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('quota') || msg.includes('high demand');
-        
-        if (isRateLimitError(primaryError.message || '')) {
-            try {
-                const videoUrls = await generateVideoSequence(script);
-                return { script, audioUrl, videoUrls };
-            } catch (fallback1Error: any) {
-                if (isRateLimitError(fallback1Error.message || '')) {
-                    const imageUrls = await generateImageSequence(script);
-                    return { script, audioUrl, imageUrls };
-                }
-                // If the video sequence fallback failed for a different reason, throw that error
-                throw fallback1Error;
-            }
-        }
-        // If it's a different error from the primary generation, re-throw it
-        throw primaryError;
-    }
+    const initialImage = await generateInitialImage(prompt);
+    const videoUrl = await generateVideoFromImage(script, initialImage);
+    return { script, audioUrl, videoUrl };
 
   } catch (e: any) {
-    console.error('Story generation failed:', e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
     
     if (errorMessage.includes('safety policies')) {
