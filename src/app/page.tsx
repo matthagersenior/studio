@@ -51,7 +51,7 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user) {
+    if (isUserLoading || !user) {
         toast({
             variant: "destructive",
             title: "Not Signed In",
@@ -150,14 +150,14 @@ export default function Home() {
                           className="resize-none bg-white/50 text-base text-gray-800"
                           rows={3}
                           {...field}
-                          disabled={loadingState !== 'idle' || !user}
+                          disabled={loadingState !== 'idle' || isUserLoading}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={loadingState !== 'idle' || !user} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
+                <Button type="submit" disabled={loadingState !== 'idle' || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
                    {loadingState !== 'idle' ? 'Generating...' : 'ROT IT!'}
                 </Button>
               </form>
