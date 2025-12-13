@@ -24,26 +24,41 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
 
     video.src = videoUrl;
     video.muted = true;
-    video.loop = true; // Loop the video for a better experience
+    video.loop = true;
     video.playsInline = true;
 
     // Attempt to play the video once it's ready
-    video.play().catch(e => {
-      console.error("Video autoplay was prevented.", e);
-      // If autoplay is blocked, the user will need to interact to start.
-      // The mute/unmute button will serve this purpose.
-    });
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(e => {
+            console.error("Video autoplay was prevented.", e);
+            // If autoplay is blocked, the user will need to interact to start.
+            // The mute/unmute button will serve this purpose.
+        });
+    }
 
+    // Cleanup function to run when the component unmounts or videoUrl changes
+    return () => {
+        if(video) {
+            video.pause();
+            video.removeAttribute('src'); // Free up memory
+            video.load();
+        }
+    };
   }, [videoUrl]);
 
   const handleMuteToggle = () => {
     const video = videoRef.current;
     if (!video) return;
 
-    // This component only displays a silent video, so this button is a dummy button.
-    // In a real scenario, you'd toggle video.muted
-    setIsMuted(!isMuted); 
-    
+    const newMutedState = !video.muted;
+    video.muted = newMutedState;
+    setIsMuted(newMutedState);
+
+    // If we are unmuting, ensure the video is playing
+    if (!newMutedState && video.paused) {
+        video.play().catch(e => console.error("Could not play video on unmute:", e));
+    }
   };
   
   const handleMediaMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
