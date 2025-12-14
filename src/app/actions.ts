@@ -37,14 +37,16 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script and the image prompt in a single, reliable call.
+    // Step 1: Generate the story script.
+    // We ask the model to return a JSON object as a string, which is more reliable
+    // than using complex output schemas that have been causing issues.
     const storyResponse = await ai.generate({
         model: 'googleai/gemini-1.5-flash',
         prompt: `You are a master storyteller. Based on the prompt below, create a short, dramatic, and engaging story script.
 
         Return ONLY a single, valid JSON object with one key: "script".
 
-        Do not wrap the JSON in markdown or any other characters.
+        Do not wrap the JSON in markdown (e.g. \`\`\`json) or any other characters.
 
         Prompt: "${prompt}"`,
     });
@@ -67,8 +69,8 @@ export async function generateStory(
       return { error: 'Failed to generate a valid story script.' };
     }
 
-    // Step 2: Generate the audio and create a placeholder image URL
-    // We run the audio generation and create the image URL in parallel.
+    // Step 2: Generate the audio and image in parallel.
+    // For stability, we use a reliable placeholder image service instead of a generative model.
     const [audioResult] = await Promise.all([
       // Generate the voiceover from the script.
       ai.generate({
@@ -80,7 +82,8 @@ export async function generateStory(
       }),
     ]);
     
-    // Using a stable placeholder image service to avoid model failures.
+    // Using a stable placeholder image service to avoid model failures and ensure a visual is always present.
+    // The seed is based on the current time to get a different image for each generation.
     const imageUrl = `https://picsum.photos/seed/${Date.now()}/540/960`;
 
 
