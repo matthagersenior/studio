@@ -21,7 +21,7 @@ const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'generating';
+type LoadingState = 'idle' | 'generating-script' | 'generating-assets' | 'done';
 
 export default function Home() {
   const [generationResult, setGenerationResult] = useState<Omit<StoryResultPayload, 'error'> | null>(null);
@@ -51,11 +51,11 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('generating');
+    setLoadingState('generating-script');
     setGenerationResult(null);
 
     const result = await generateStory(values.prompt);
-    
+
     if (result.error) {
       toast({
         variant: "destructive",
@@ -65,7 +65,7 @@ export default function Home() {
       setLoadingState('idle');
     } else {
       setGenerationResult(result);
-      setLoadingState('idle');
+      setLoadingState('done');
     }
   }
 
@@ -75,7 +75,7 @@ export default function Home() {
     form.reset();
   }
 
-  const isLoading = loadingState === 'generating';
+  const isLoading = loadingState.startsWith('generating');
 
   if (isLoading) {
     return (
@@ -99,6 +99,7 @@ export default function Home() {
       <StoryResult
         script={generationResult.script}
         imageUrl={generationResult.imageUrl}
+        audioUrl={generationResult.audioUrl}
         onReset={resetApp}
       />
     );
@@ -136,15 +137,15 @@ export default function Home() {
                           className="resize-none bg-white/50 text-base text-gray-800"
                           rows={3}
                           {...field}
-                          disabled={loadingState !== 'idle'}
+                          disabled={isLoading}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={loadingState !== 'idle' || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
-                   {loadingState !== 'idle' ? 'Generating...' : 'ROT IT!'}
+                <Button type="submit" disabled={isLoading || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
+                   {isLoading ? 'Generating...' : 'ROT IT!'}
                 </Button>
               </form>
             </Form>
@@ -154,3 +155,4 @@ export default function Home() {
     </main>
   );
 }
+
