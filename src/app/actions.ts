@@ -40,7 +40,6 @@ const generateStoryPrompt = ai.definePrompt({
   name: 'generateStoryPrompt',
   input: {schema: GenerateStoryInputSchema},
   output: {schema: GenerateStoryOutputSchema},
-  model: 'googleai/gemini-pro',
   prompt: `
     You are a creative writer who specializes in creating short, dramatic, and slightly absurd "brain rot" style story scripts.
     Based on the user's prompt, create a script that is cringey, dramatic, and meme-worthy.
@@ -60,7 +59,6 @@ async function generateScriptAndImagePrompt(prompt: string) {
 
 async function generateImage(imagePrompt: string) {
   const {media} = await ai.generate({
-    model: 'googleai/imagen-2',
     prompt: imagePrompt,
   });
 
@@ -73,7 +71,6 @@ async function generateImage(imagePrompt: string) {
 
 async function generateVoiceover(script: string) {
   const {media} = await ai.generate({
-    model: 'googleai/text-to-speech',
     config: {
       responseModalities: ['AUDIO'],
       speechConfig: {
