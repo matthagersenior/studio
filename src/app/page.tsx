@@ -15,7 +15,6 @@ import { StoryResult } from "@/components/story-result";
 import type { StoryResultPayload } from "@/app/actions";
 import { useUser, useAuth } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
-import Image from "next/image";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
@@ -88,7 +87,6 @@ export default function Home() {
                 height={300}
             />
             <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-            <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to a minute.</p>
           </>
       </main>
     );
@@ -99,7 +97,7 @@ export default function Home() {
       <StoryResult
         script={generationResult.script}
         audioUrl={generationResult.audioUrl}
-        videoUrl={generationResult.videoUrl}
+        imageUrl={generationResult.imageUrl}
         onReset={resetApp}
       />
     );

@@ -3,6 +3,7 @@
 
 import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
+import Image from 'next/image';
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 import {
@@ -15,13 +16,12 @@ import {
 interface StoryResultProps {
   script: string;
   audioUrl: string;
-  videoUrl: string;
+  imageUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, imageUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -29,41 +29,35 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
   // Autoplay and setup logic
   useEffect(() => {
     const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video || !audioUrl || !videoUrl) return;
+    if (!audio || !audioUrl) return;
 
     audio.src = audioUrl;
-    video.src = videoUrl;
 
     const attemptPlay = async () => {
       try {
-        video.muted = true; // Video should be silent, audio comes from audio element
         audio.muted = isMuted; // Reflect user's mute choice
-        await video.play();
         await audio.play();
         setIsPlaying(true);
       } catch (error) {
         console.error('Autoplay was prevented:', error);
         setIsPlaying(false);
-        setIsMuted(true); 
+        setIsMuted(true); // Mute to allow showing controls to unmute and play
       }
     };
-    
+
     const handleCanPlay = () => {
         if (audio.duration > 0 && isFinite(audio.duration)) {
             setMediaDuration(audio.duration);
         }
         attemptPlay();
     };
-    
+
     audio.addEventListener('canplaythrough', handleCanPlay);
-    video.addEventListener('canplaythrough', handleCanPlay);
     
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
-      video.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl, videoUrl, isMuted]);
+  }, [audioUrl, isMuted]);
 
 
   useEffect(() => {
@@ -73,62 +67,46 @@ export function StoryResult({ script, audioUrl, videoUrl, onReset }: StoryResult
     }
   }, [isMuted]);
 
-  const playMedia = () => {
-    const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video) return;
-
-    Promise.all([audio.play(), video.play()])
-      .then(() => setIsPlaying(true))
-      .catch(e => console.error("Media play failed:", e));
-  };
-
-  const pauseMedia = () => {
-    const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video) return;
-
-    audio.pause();
-    video.pause();
-    setIsPlaying(false);
-  };
-
   const handlePlayPauseToggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      pauseMedia();
+      audio.pause();
+      setIsPlaying(false);
     } else {
-      playMedia();
+      audio.play().then(() => setIsPlaying(true)).catch(e => console.error("Media play failed:", e));
     }
   };
   
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
+    // If user unmutes and it's paused, start playing.
     if (!newMutedState && !isPlaying) {
-        playMedia();
+        audioRef.current?.play().then(() => setIsPlaying(true));
     }
   };
 
   return (
     <TooltipProvider>
-      <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-        <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
+      <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
+        <div className="w-full h-full max-w-md aspect-[9/16] relative overflow-hidden bg-black rounded-xl shadow-2xl shadow-primary/20">
           
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            loop
-            playsInline
-            muted
-            className="absolute inset-0 w-full h-full object-cover animate-kenburns"
+          <Image
+            src={imageUrl}
+            alt="Generated visual"
+            fill
+            className="object-cover animate-kenburns"
+            priority
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
 
           <audio ref={audioRef} playsInline loop />
           
-          <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
-             <div className="pointer-events-auto text-center text-white font-semibold text-xl md:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+          <div className="absolute inset-x-0 bottom-0 h-2/5 p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
+             <div className="pointer-events-auto text-center text-white font-semibold text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                 <KaraokeScript
                     script={script}
                     mediaRef={audioRef}
