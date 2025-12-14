@@ -11,21 +11,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { generateStory } from "@/app/actions";
-import { StoryResult } from "@/components/story-result";
 import type { StoryResultPayload } from "@/app/actions";
 import { useUser, useAuth } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
-import Image from "next/image";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'generating' | 'done';
-
 export default function Home() {
   const [generationResult, setGenerationResult] = useState<Omit<StoryResultPayload, 'error'> | null>(null);
-  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
@@ -51,10 +47,11 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('generating');
+    setIsLoading(true);
     setGenerationResult(null);
 
     const result = await generateStory(values.prompt);
+    setIsLoading(false);
 
     if (result.error) {
       toast({
@@ -63,65 +60,31 @@ export default function Home() {
         description: result.error,
         duration: 9000,
       });
-      setLoadingState('idle');
     } else {
       setGenerationResult(result);
-      setLoadingState('done');
+       toast({
+        title: "Generation Complete!",
+        description: "Your story has been generated.",
+      });
     }
   }
 
-  function resetApp() {
-    setGenerationResult(null);
-    setLoadingState('idle');
-    form.reset();
-  }
-
-  const isLoading = loadingState === 'generating';
-
-  if (isLoading) {
-    return (
-      <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
-          <>
-            <Image 
-                src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
-                alt="Now Loading..."
-                width={300}
-                height={300}
-                unoptimized
-            />
-            <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-          </>
-      </main>
-    );
-  }
-
-  if (generationResult) {
-    return (
-      <StoryResult
-        script={generationResult.script}
-        imageUrl={generationResult.imageUrl}
-        audioUrl={generationResult.audioUrl}
-        onReset={resetApp}
-      />
-    );
-  }
-
   return (
-    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-black">
-      <div className="max-w-4xl mx-auto space-y-8 w-full">
+    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-gray-100 dark:bg-gray-900">
+      <div className="max-w-2xl mx-auto space-y-8 w-full">
         <header className="text-center">
-          <h1 className="text-3xl md:text-5xl font-bold text-white font-headline">
-            AI BRAIN ROT
+          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 dark:text-gray-50">
+            Story Generator
           </h1>
-          <p className="text-gray-400 mt-2">
-            Let's See What We Can Come Up With
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Enter a prompt and let AI bring it to life.
           </p>
         </header>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200/30 shadow-2xl">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-gray-800">Create Your Story</CardTitle>
-            <CardDescription className="text-gray-600">Enter a prompt and let AI bring it to life.</CardDescription>
+            <CardTitle>Create Your Story</CardTitle>
+            <CardDescription>Enter a prompt and let AI bring it to life.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -135,7 +98,7 @@ export default function Home() {
                       <FormControl>
                         <Textarea
                           placeholder="e.g., A dramatic monologue for a cat staring out a window"
-                          className="resize-none bg-white/50 text-base text-gray-800"
+                          className="resize-none"
                           rows={3}
                           {...field}
                           disabled={isLoading}
@@ -145,13 +108,38 @@ export default function Home() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading || isUserLoading} className="w-full text-lg font-semibold py-6 bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-[1.01]">
-                   {isLoading ? 'Generating...' : 'ROT IT!'}
+                <Button type="submit" disabled={isLoading || isUserLoading} className="w-full">
+                   {isLoading ? 'Generating...' : 'Generate Story'}
                 </Button>
               </form>
             </Form>
           </CardContent>
         </Card>
+
+        {generationResult && (
+           <Card>
+             <CardHeader>
+               <CardTitle>Result</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-4">
+                <div>
+                    <h3 className="font-semibold">Script:</h3>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{generationResult.script}</p>
+                </div>
+                 <div>
+                    <h3 className="font-semibold">Visual:</h3>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={generationResult.imageUrl} alt="Generated visual" className="rounded-md w-full" />
+                </div>
+                 <div>
+                    <h3 className="font-semibold">Voiceover:</h3>
+                    <audio controls src={generationResult.audioUrl} className="w-full">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+             </CardContent>
+           </Card>
+        )}
       </div>
     </main>
   );
