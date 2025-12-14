@@ -11,57 +11,60 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import Image from "next/image";
-
 
 interface StoryResultProps {
   script: string;
-  imageUrl?: string;
+  videoUrl?: string;
   audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // Audio is not muted by default
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // Autoplay logic - attempts to play audio when component can play
+  // Autoplay logic
   useEffect(() => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    if (!video || !audio || !videoUrl || !audioUrl) return;
 
+    video.src = videoUrl;
     audio.src = audioUrl;
 
     const attemptPlay = async () => {
-        try {
-            await audio.play();
-            setIsPlaying(true);
-        } catch (error) {
-            console.error('Autoplay was prevented:', error);
-            setIsPlaying(false);
-            // If autoplay with sound fails, we don't force mute.
-            // The user must interact to start playback.
-        }
+      try {
+        await Promise.all([video.play(), audio.play()]);
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Autoplay was prevented:', error);
+        setIsPlaying(false);
+        // If autoplay fails, user must interact. We'll leave sound unmuted.
+      }
     };
     
+    video.muted = true; // Video track is always muted to prevent dual audio
     audio.muted = isMuted;
 
     const handleCanPlay = () => {
       if (audio.duration > 0 && isFinite(audio.duration)) {
-          setMediaDuration(audio.duration);
+        setMediaDuration(audio.duration);
       }
       attemptPlay();
     };
     
     const handleEnded = () => {
-        setIsPlaying(false);
-        // Optional: loop
-        if(audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().then(() => setIsPlaying(true));
-        }
+      setIsPlaying(false);
+      // Loop
+      if (videoRef.current && audioRef.current) {
+        videoRef.current.currentTime = 0;
+        audioRef.current.currentTime = 0;
+        videoRef.current.play();
+        audioRef.current.play().then(() => setIsPlaying(true));
+      }
     };
 
     audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
@@ -71,20 +74,23 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       audio.removeEventListener('canplaythrough', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioUrl, isMuted]);
+  }, [videoUrl, audioUrl, isMuted]);
 
 
   const playMedia = () => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!video || !audio) return;
     
-    audio.play().then(() => setIsPlaying(true)).catch(e => console.error("Audio play failed:", e));
+    Promise.all([video.play(), audio.play()]).then(() => setIsPlaying(true)).catch(e => console.error("Media play failed:", e));
   };
 
   const pauseMedia = () => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!video || !audio) return;
 
+    video.pause();
     audio.pause();
     setIsPlaying(false);
   };
@@ -108,10 +114,11 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
   };
 
   const handleDownload = () => {
-    if (imageUrl) {
+    if (videoUrl) {
       const a = document.createElement('a');
-      a.href = imageUrl;
-      a.download = `brain-rot-image-${Date.now()}.png`; 
+      a.href = videoUrl;
+      // The file extension might not be known, so we'll just suggest a name
+      a.download = `brain-rot-video-${Date.now()}.mp4`; 
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -123,16 +130,9 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
+          <video ref={videoRef} playsInline loop muted className="w-full h-full object-cover" />
           <audio ref={audioRef} playsInline />
 
-          {imageUrl && (
-             <Image
-                src={imageUrl}
-                alt="Generated story visual"
-                fill
-                className={`w-full h-full object-cover transition-transform duration-[5s] ease-out ${isPlaying ? 'animate-kenburns' : ''}`}
-            />
-          )}
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none flex flex-col justify-end">
              <div
@@ -170,12 +170,12 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
             
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button onClick={handleDownload} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full pointer-events-auto" disabled={!imageUrl}>
+                <Button onClick={handleDownload} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full pointer-events-auto" disabled={!videoUrl}>
                   <Download size={20} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Download Image</p>
+                <p>Download Video</p>
               </TooltipContent>
             </Tooltip>
           </div>
