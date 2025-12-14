@@ -8,7 +8,7 @@ export type StoryResultPayload = {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
-  imageUrl?: string;
+  imageUrl?: string; // Keep imageUrl for context, even if video is the primary visual
   error?: never;
 };
 
@@ -58,12 +58,21 @@ async function generateVideoFromImage(imageUrl: string, script: string): Promise
     }
     
     let finalOperation = operation;
-    while (!finalOperation.done) {
-        // Wait for 5 seconds before checking the status again.
-        await new Promise(resolve => setTimeout(resolve, 5000));
+    // Wait for up to 90 seconds.
+    const maxWaitTime = 90000;
+    const interval = 5000;
+    let waitedTime = 0;
+
+    while (!finalOperation.done && waitedTime < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, interval));
+        waitedTime += interval;
         finalOperation = await ai.checkOperation(finalOperation);
     }
     
+    if (!finalOperation.done) {
+        throw new Error('Video generation timed out after 90 seconds.');
+    }
+
     if (finalOperation.error) {
         throw new Error(`Video generation failed: ${finalOperation.error.message}`);
     }
@@ -73,8 +82,6 @@ async function generateVideoFromImage(imageUrl: string, script: string): Promise
         throw new Error('Generated video content could not be found.');
     }
 
-    // The URL from Veo is temporary and needs the API key to be accessed.
-    // We will fetch it server-side and convert it to a data URI to send to the client.
     const fetch = (await import('node-fetch')).default;
     const videoDownloadResponse = await fetch(
         `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
@@ -122,13 +129,9 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Step 1: Generate the script, which is needed for everything else.
     const script = await generateScript(prompt);
-    
-    // Step 2: Generate the initial image. This is required for the video animation.
     const imageUrl = await generateInitialImage(script);
 
-    // Step 3: Kick off video animation and voiceover generation in parallel
     const [videoResult, audioResult] = await Promise.allSettled([
       generateVideoFromImage(imageUrl, script), 
       generateVoiceover(script),
@@ -146,7 +149,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
     return { 
       script,
-      imageUrl, // Pass the original image through for context
+      imageUrl,
       videoUrl: videoResult.value,
       audioUrl: audioResult.value,
     };

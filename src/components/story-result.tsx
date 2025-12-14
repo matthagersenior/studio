@@ -21,7 +21,6 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // Effect to initialize media sources
   useEffect(() => {
     const video = videoRef.current;
     const audio = audioRef.current;
@@ -38,7 +37,6 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     audio?.addEventListener('loadedmetadata', handleAudioMetadata);
 
     const handleVideoEnd = () => {
-      // When the video (animation) ends, seek both to the start to loop them
       if(video && audio) {
         video.currentTime = 0;
         audio.currentTime = 0;
@@ -61,7 +59,6 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     const audio = audioRef.current;
     if (!video || !audio) return;
     
-    // Ensure video is unmuted if we are unmuting audio, but keep it visually muted in the tag
     if (audio) audio.muted = false;
 
     const videoPromise = video.play();
@@ -69,10 +66,11 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
 
     Promise.all([videoPromise, audioPromise]).then(() => {
         setIsPlaying(true);
+        if (isMuted) { // If we started playing but the user intention is muted, mute the audio now.
+            audio.muted = true;
+        }
     }).catch(e => {
         console.error("Media play failed:", e);
-        // On some browsers, autoplay is blocked. User must interact.
-        // We will set playing to false, and the next click will try again.
         setIsPlaying(false);
     });
   };
@@ -102,7 +100,6 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
         audioRef.current.muted = newMutedState;
     }
 
-    // If unmuting for the first time, try to play
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -112,18 +109,17 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
-        {videoUrl && (
+        {videoUrl ? (
            <video
             ref={videoRef}
-            src={videoUrl}
             playsInline
-            loop // The visual part should loop
+            loop
             muted // Video is always muted, audio is handled by the separate audio element
             className="w-full h-full object-cover"
           />
-        )}
+        ) : null }
         
-        {audioUrl && <audio ref={audioRef} loop />}
+        {audioUrl && <audio ref={audioRef} muted={isMuted} />}
 
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
