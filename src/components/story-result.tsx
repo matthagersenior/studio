@@ -30,6 +30,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
 
   // Slideshow logic
   useEffect(() => {
+    if (imageUrls.length === 0) return;
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
     }, 2000); // Change image every 2 seconds
@@ -121,7 +122,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
           <div className="w-full h-full">
             {imageUrls.map((url, index) => (
                 <Image 
-                    key={url}
+                    key={`${url}-${index}`}
                     src={url}
                     alt="Generated visual"
                     fill
