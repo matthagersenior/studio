@@ -5,85 +5,105 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX, Play, Pause } from "lucide-react";
-import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  imageUrls?: string[];
+  videoUrl?: string;
   audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // This effect handles loading the media sources into the elements
+  // Effect to load media sources and handle metadata
   useEffect(() => {
+    const video = videoRef.current;
     const audio = audioRef.current;
+
+    if (video && videoUrl) video.src = videoUrl;
     if (audio && audioUrl) audio.src = audioUrl;
 
-    const handleAudioMetadata = () => {
-      if (audio && audio.duration > 0 && isFinite(audio.duration)) {
-        setMediaDuration(audio.duration);
-      }
-    };
-    
-    audio?.addEventListener('loadedmetadata', handleAudioMetadata);
-    
-    const handleAudioEnd = () => {
-      if (audio) {
-        audio.currentTime = 0;
-        setCurrentImageIndex(0); // Reset slideshow
-        audio.play(); // Loop
-      }
-    };
-    audio?.addEventListener('ended', handleAudioEnd);
+    const sourceToUse = videoUrl && video ? video : audio;
 
+    const handleMetadata = () => {
+      if (sourceToUse && sourceToUse.duration > 0 && isFinite(sourceToUse.duration)) {
+        setMediaDuration(sourceToUse.duration);
+      }
+    };
+    
+    sourceToUse?.addEventListener('loadedmetadata', handleMetadata);
+    
     return () => {
-      audio?.removeEventListener('loadedmetadata', handleAudioMetadata);
-      audio?.removeEventListener('ended', handleAudioEnd);
+      sourceToUse?.removeEventListener('loadedmetadata', handleMetadata);
     };
-  }, [audioUrl]);
+  }, [videoUrl, audioUrl]);
 
-  // Slideshow effect
+  // Autoplay logic
   useEffect(() => {
-    if (!imageUrls || imageUrls.length === 0 || mediaDuration === 0 || !isPlaying) return;
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (!video || !audio) return;
 
-    const intervalTime = Math.max(1000, mediaDuration * 1000 / imageUrls.length);
-    const interval = setInterval(() => {
-      setCurrentImageIndex(prevIndex => (prevIndex + 1) % imageUrls.length);
-    }, intervalTime);
+    const attemptPlay = async () => {
+        try {
+            await Promise.all([video.play(), audio.play()]);
+            setIsPlaying(true);
+        } catch (error) {
+            console.error('Autoplay was prevented:', error);
+            setIsPlaying(false); // Ensure state is correct if autoplay fails
+        }
+    };
+    
+    // Muted autoplay is more likely to succeed
+    video.muted = true;
+    audio.muted = true;
+    setIsMuted(true);
 
-    return () => clearInterval(interval);
-  }, [imageUrls, mediaDuration, isPlaying]);
+    const canPlayVideo = video.readyState >= 3;
+    const canPlayAudio = audio.readyState >= 3;
+
+    if (canPlayVideo && canPlayAudio) {
+      attemptPlay();
+    } else {
+      const handleCanPlay = () => {
+        if (video.readyState >=3 && audio.readyState >= 3) {
+            attemptPlay();
+            video.removeEventListener('canplaythrough', handleCanPlay);
+            audio.removeEventListener('canplaythrough', handleCanPlay);
+        }
+      };
+      video.addEventListener('canplaythrough', handleCanPlay);
+      audio.addEventListener('canplaythrough', handleCanPlay);
+      
+      return () => {
+        video.removeEventListener('canplaythrough', handleCanPlay);
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+      };
+    }
+  }, [videoUrl, audioUrl]);
 
 
   const playMedia = () => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!video || !audio) return;
     
-    audio.muted = false;
-    setIsMuted(false);
-
-    const audioPromise = audio.play();
-
-    audioPromise.then(() => {
-        setIsPlaying(true);
-    }).catch(e => {
-        console.error("Media play failed:", e);
-        // Play was likely interrupted or blocked by the browser.
-        setIsPlaying(false);
-    });
+    video.play().catch(e => console.error("Video play failed:", e));
+    audio.play().catch(e => console.error("Audio play failed:", e));
+    setIsPlaying(true);
   };
 
   const pauseMedia = () => {
+    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!video || !audio) return;
 
+    video.pause();
     audio.pause();
     setIsPlaying(false);
   };
@@ -99,65 +119,27 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if(audioRef.current) {
-        audioRef.current.muted = newMutedState;
-    }
-    // If unmuting and not already playing, start playback.
+    if (videoRef.current) videoRef.current.muted = newMutedState;
+    if (audioRef.current) audioRef.current.muted = newMutedState;
+
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
   };
 
-  // Autoplay on mount when ready
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
-  
-    // Function to attempt playing the media
-    const attemptPlay = () => {
-      if (audio.muted) { // Autoplay is more likely to succeed if muted
-        const playPromise = audio.play();
-        playPromise.then(() => {
-          setIsPlaying(true);
-        }).catch(error => {
-          console.error('Autoplay was prevented:', error);
-          setIsPlaying(false); // Ensure state is correct if autoplay fails
-        });
-      }
-    };
-  
-    // Check if the audio is ready to play
-    if (audio.readyState >= 3) { // HAVE_FUTURE_DATA
-      attemptPlay();
-    } else {
-      // If not ready, listen for the 'canplaythrough' event
-      const handleCanPlay = () => {
-        attemptPlay();
-        audio.removeEventListener('canplaythrough', handleCanPlay); // Clean up listener
-      };
-      audio.addEventListener('canplaythrough', handleCanPlay);
-  
-      return () => {
-        audio.removeEventListener('canplaythrough', handleCanPlay);
-      };
-    }
-  }, [audioUrl]);
-
-
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      <audio ref={audioRef} muted playsInline loop />
-
+      <audio ref={audioRef} loop />
+      
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
-        {imageUrls && imageUrls.length > 0 && (
-          <Image
-            key={currentImageIndex} // Force re-render on change
-            src={imageUrls[currentImageIndex]}
-            alt="Generated story visual"
-            fill
-            className="object-cover animate-kenburns"
-            priority={true}
+        {videoUrl && (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            loop
+            playsInline
+            className="w-full h-full object-cover"
           />
         )}
         
