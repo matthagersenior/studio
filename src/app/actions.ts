@@ -41,7 +41,7 @@ async function generateInitialImage(prompt: string): Promise<string> {
 }
 
 async function generateVideoFromImage(imageUrl: string, script: string): Promise<string> {
-    const { operation } = await ai.generate({
+    let { operation } = await ai.generate({
         model: 'googleai/veo-2.0-generate-001',
         prompt: [
             { text: `Animate this image in a short, looping, chaotic, meme-worthy style. The animation should reflect the absurd energy of the following script: ${script}` },
