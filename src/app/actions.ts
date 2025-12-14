@@ -10,7 +10,7 @@ import { toWav } from '@/lib/audio';
 import { z } from 'zod';
 
 // Define the schema for the structured story generation.
-// We will ask the model to return a JSON string that we parse manually.
+// This will be used to validate the data we parse from the model's text response.
 const storyGenerationSchema = z.object({
   script: z
     .string()
@@ -121,11 +121,9 @@ Prompt: "${prompt}"`,
     };
   } catch (e: any) {
     console.error('An error occurred during story generation:', e);
-
     // Provide a more user-friendly error message, but log the full technical error.
     let message = 'An unknown error occurred during generation.';
     if (e.message) {
-      // Catch specific, common errors and provide better messages.
       if (e.message.includes('v1beta')) {
         message = `An AI model required by the application is not available. This is a configuration issue. (Details: ${e.message})`;
       } else if (e.message.includes('404') || e.message.includes('Not Found')) {
@@ -136,7 +134,6 @@ Prompt: "${prompt}"`,
         message = e.message;
       }
     }
-
     return {
       error: `Generation Failed: ${message}`,
     };

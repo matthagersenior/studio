@@ -1,3 +1,4 @@
+
 'use client';
 
 import {useState, useRef, useEffect} from 'react';
@@ -72,7 +73,7 @@ export function StoryResult({
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full h-full max-w-md aspect-[9/16] relative overflow-hidden bg-black rounded-xl shadow-2xl shadow-primary/20">
-        <audio ref={audioRef} src={audioUrl} />
+        <audio ref={audioRef} src={audioUrl} loop />
 
         <Image
           src={imageUrl}
