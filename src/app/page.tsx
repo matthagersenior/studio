@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,6 +13,9 @@ import { generateStory } from "@/app/actions";
 import type { StoryResultPayload } from "@/app/actions";
 import { useUser, useAuth } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
+import { StoryResult } from "@/components/story-result";
+import { Loader2 } from "lucide-react";
+
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
@@ -51,9 +53,9 @@ export default function Home() {
     setGenerationResult(null);
 
     const result = await generateStory(values.prompt);
-    setIsLoading(false);
 
     if (result.error) {
+      setIsLoading(false);
       toast({
         variant: "destructive",
         title: "Generation Failed",
@@ -61,12 +63,35 @@ export default function Home() {
         duration: 9000,
       });
     } else {
-      setGenerationResult(result);
+       // Don't set loading to false immediately, let the result component handle it
+       setGenerationResult(result);
        toast({
         title: "Generation Complete!",
-        description: "Your story has been generated.",
+        description: "Your story is ready.",
       });
     }
+  }
+  
+  const handleNewStory = () => {
+    setGenerationResult(null);
+    setIsLoading(false);
+    form.reset();
+  }
+
+
+  if (isLoading) {
+     return (
+       <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-gray-900 text-white">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <p className="text-lg text-center bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 bg-clip-text text-transparent animate-pulse animate-bg-pan">
+            Your brain is rotting...
+          </p>
+       </div>
+     );
+  }
+
+  if (generationResult) {
+    return <StoryResult {...generationResult} onNewStory={handleNewStory} />;
   }
 
   return (
@@ -74,10 +99,10 @@ export default function Home() {
       <div className="max-w-2xl mx-auto space-y-8 w-full">
         <header className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-gray-900 dark:text-gray-50">
-            Story Generator
+            Brainrot Creator
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Enter a prompt and let AI bring it to life.
+            Enter a prompt and let the AI generate a cinematic story.
           </p>
         </header>
 
@@ -115,31 +140,6 @@ export default function Home() {
             </Form>
           </CardContent>
         </Card>
-
-        {generationResult && (
-           <Card>
-             <CardHeader>
-               <CardTitle>Result</CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-4">
-                <div>
-                    <h3 className="font-semibold">Script:</h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{generationResult.script}</p>
-                </div>
-                 <div>
-                    <h3 className="font-semibold">Visual:</h3>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={generationResult.imageUrl} alt="Generated visual" className="rounded-md w-full" />
-                </div>
-                 <div>
-                    <h3 className="font-semibold">Voiceover:</h3>
-                    <audio controls src={generationResult.audioUrl} className="w-full">
-                        Your browser does not support the audio element.
-                    </audio>
-                </div>
-             </CardContent>
-           </Card>
-        )}
       </div>
     </main>
   );
