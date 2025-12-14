@@ -1,13 +1,12 @@
+
 'use server';
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
-import { googleAI } from '@genkit-ai/google-genai';
-import { GenerateRequest } from "genkit";
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl: string;
+  imageUrl: string;
   audioUrl: string;
   error?: never;
 };
@@ -16,7 +15,7 @@ export type StoryGenerationError = {
   error: string;
 };
 
-async function generateScript(prompt: string): Promise<string> {
+async function generateScriptAndVoice(prompt: string): Promise<{ script: string; audioUrl: string }> {
   const scriptResponse = await ai.generate({
     prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
   });
@@ -25,99 +24,34 @@ async function generateScript(prompt: string): Promise<string> {
   if (!script) {
     throw new Error('Failed to generate story script.');
   }
-  return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
-}
+  script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-async function generateImage(prompt: string): Promise<string> {
-    const { media } = await ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a single, cinematic, high-quality, vibrant, and slightly surreal image to accompany the following script. The image should be in a vertical 9:16 aspect ratio. Script: "${prompt}"`
-    });
-
-    if (!media?.url) {
-        throw new Error('Failed to generate image.');
-    }
-    return media.url;
-}
-
-async function generateVideo(imageUrl: string, prompt: string): Promise<string> {
-    let { operation } = await ai.generate({
-        model: googleAI.model('veo-2.0-generate-001'),
-        prompt: [
-            { text: `Animate this image in a cinematic, looping style that matches the tone of the script. The video should have subtle but constant motion. Script: "${prompt}"` },
-            { media: { url: imageUrl, contentType: 'image/png' } }
-        ],
-        config: {
-            durationSeconds: 5,
-            aspectRatio: '9:16',
-        }
-    } as GenerateRequest);
-
-    if (!operation) {
-        throw new Error('Expected the model to return an operation for video generation.');
-    }
-
-    // Poll for completion
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before checking again
-        operation = await ai.checkOperation(operation);
-    }
-
-    if (operation.error) {
-        console.error('Video generation failed:', operation.error);
-        throw new Error(`Failed to generate video: ${operation.error.message}`);
-    }
-
-    const videoPart = operation.output?.message?.content.find(p => !!p.media && p.media.contentType === 'video/mp4');
-
-    if (!videoPart?.media?.url) {
-        throw new Error('Generated video content was not found in the operation result.');
-    }
-    
-    // The URL from Veo is temporary and needs to be fetched and converted to a data URI
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set.');
-    }
-    const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${apiKey}`);
-
-    if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
-        throw new Error(`Failed to download the generated video. Status: ${videoDownloadResponse.status}`);
-    }
-
-    const videoBuffer = await videoDownloadResponse.arrayBuffer();
-    const base64Video = Buffer.from(videoBuffer).toString('base64');
-    
-    return `data:video/mp4;base64,${base64Video}`;
-}
-
-
-async function generateVoiceover(script: string): Promise<string> {
-    const { media } = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' },
-          },
+  const { media } = await ai.generate({
+    model: 'googleai/gemini-2.5-flash-preview-tts',
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'Algenib' },
         },
       },
-      prompt: script,
-    });
-    
-    if (!media?.url) {
-      throw new Error('Failed to generate voiceover.');
-    }
-    
-    const audioBuffer = Buffer.from(
-      media.url.substring(media.url.indexOf(',') + 1),
-      'base64'
-    );
-    
-    const wavBase64 = await toWav(audioBuffer);
-    return `data:audio/wav;base64,${wavBase64}`;
+    },
+    prompt: script,
+  });
+  
+  if (!media?.url) {
+    throw new Error('Failed to generate voiceover.');
+  }
+  
+  const audioBuffer = Buffer.from(
+    media.url.substring(media.url.indexOf(',') + 1),
+    'base64'
+  );
+  
+  const wavBase64 = await toWav(audioBuffer);
+  const audioUrl = `data:audio/wav;base64,${wavBase64}`;
+
+  return { script, audioUrl };
 }
 
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
@@ -126,21 +60,15 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Step 1: Generate Script
-    const script = await generateScript(prompt);
+    const { script, audioUrl } = await generateScriptAndVoice(prompt);
     
-    // Step 2: Generate Image and Audio in parallel
-    const [imageUrl, audioUrl] = await Promise.all([
-        generateImage(script),
-        generateVoiceover(script)
-    ]);
-    
-    // Step 3: Generate Video from the image
-    const videoUrl = await generateVideo(imageUrl, script);
+    // Using a reliable placeholder image to avoid model errors
+    const seed = Math.random();
+    const imageUrl = `https://picsum.photos/seed/${seed}/540/960`;
 
     return { 
       script,
-      videoUrl,
+      imageUrl,
       audioUrl,
     };
 
