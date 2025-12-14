@@ -3,11 +3,12 @@
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import { googleAI } from "@genkit-ai/google-genai";
 
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
-  visualUrl: string; // Will be a placeholder URL
+  visualUrl: string;
   error?: never;
 };
 
@@ -21,12 +22,25 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const [scriptResponse, audioResponse] = await Promise.all([
+    // 1. Generate the script first.
+    const scriptResponse = await ai.generate({
+      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
+    });
+
+    let script = scriptResponse.text;
+    if (!script) {
+      throw new Error('Failed to generate story script.');
+    }
+    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
+
+    // 2. Generate image and audio in parallel using the script.
+    const [imageResponse, audioResponse] = await Promise.all([
       ai.generate({
-        prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
+        model: googleAI.model('imagen-4.0-fast-generate-001'),
+        prompt: `A cinematic, surreal, meme-worthy image representing the following script: "${script}"`,
       }),
       ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: {
@@ -35,15 +49,15 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
             },
           },
         },
-        prompt: `Script: ${prompt}`, // Use the same prompt for audio generation
+        prompt: script,
       })
     ]);
-
-    let script = scriptResponse.text;
-    if (!script) {
-      throw new Error('Failed to generate story script.');
+    
+    const visualMedia = imageResponse.media;
+    if (!visualMedia?.url) {
+        throw new Error('Failed to generate visual.');
     }
-    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
+    const visualUrl = visualMedia.url;
 
     const audioMedia = audioResponse.media;
     if (!audioMedia?.url) {
@@ -57,9 +71,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   
     const wavBase64 = await toWav(audioBuffer);
     const audioUrl = `data:audio/wav;base64,${wavBase64}`;
-
-    // Use a reliable placeholder for the visual
-    const visualUrl = 'https://picsum.photos/seed/1/900/1600';
 
     return { 
       script,
