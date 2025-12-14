@@ -32,7 +32,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // STAGE 1: Generate script and image prompt
+    // STAGE 1: Generate script and image prompt in a single, efficient call.
     const initialResponse = await ai.generate({
         model: googleAI.model('gemini-1.5-flash'),
         prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script for a short video and a prompt for an image generator like DALL-E.
@@ -51,9 +51,10 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     if (!script || !imagePrompt) {
         throw new Error('Failed to generate script and image prompt.');
     }
+    // Clean up any stray markdown or parentheticals the model might add.
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    // STAGE 2: Generate audio and image in PARALLEL
+    // STAGE 2: Generate audio and image in PARALLEL for maximum efficiency.
     const [audioResult, imageResult] = await Promise.all([
       // Audio Generation
       ai.generate({
@@ -90,6 +91,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
       throw new Error('Failed to generate image.');
     }
 
+    // STAGE 3: Return the complete, successful payload.
     return {
       script,
       audioUrl,
