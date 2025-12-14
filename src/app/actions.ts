@@ -60,10 +60,8 @@ export async function generateStory(
       {prompt},
       {
         model: 'googleai/gemini-1.5-pro',
-        config: {
-          output: {
-            schema: storyGenerationSchema,
-          },
+        output: {
+          schema: storyGenerationSchema,
         },
       }
     );
