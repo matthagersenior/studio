@@ -8,25 +8,31 @@ import {genkit, ai} from '@/ai/genkit';
 import {toWav} from '@/lib/audio';
 import {z} from 'zod';
 
-// Define the schema for the story script generation prompt.
-const storyScriptSchema = z.object({
+// Define the schema for the structured story generation prompt.
+// This will generate the script and a prompt for the image generation.
+const storyGenerationSchema = z.object({
   script: z
     .string()
     .describe('A short, dramatic, engaging story script, between 150 and 200 words. It should have a clear beginning, middle, and end.'),
+  imagePrompt: z
+    .string()
+    .describe(
+      'A detailed, cinematic, and dramatic prompt for an AI image generator that visually represents the story. Focus on a key moment or the overall mood. Do not include text or overlays in the description.'
+    ),
 });
 
-// Define the prompt for generating the story script.
-const generateStoryPrompt = ai.definePrompt({
-  name: 'generateStoryPrompt',
+// Define the prompt for generating the story and image prompt.
+const generateStoryAndImagePrompt = ai.definePrompt({
+  name: 'generateStoryAndImagePrompt',
   input: {
     schema: z.object({
       prompt: z.string(),
     }),
   },
   output: {
-    schema: storyScriptSchema,
+    schema: storyGenerationSchema,
   },
-  prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc.
+  prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
 
 Prompt: {{{prompt}}}`,
 });
@@ -51,23 +57,24 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script.
-    const storyResponse = await generateStoryPrompt({prompt});
-    const {script} = storyResponse;
+    // Step 1: Generate the story script and the image prompt in a single call.
+    const storyResponse = await generateStoryAndImagePrompt(
+      {prompt},
+      {model: 'googleai/gemini-1.5-pro'}
+    );
 
-    if (!script) {
-      return {error: 'Failed to generate a story script.'};
+    const {script, imagePrompt} = storyResponse;
+
+    if (!script || !imagePrompt) {
+      return {error: 'Failed to generate a story script or image prompt.'};
     }
 
     // Step 2: Generate the visual and audio in parallel.
     const [imageResult, audioResult] = await Promise.all([
-      // Generate the cinematic visual.
+      // Generate the cinematic visual using the prompt from Step 1.
       ai.generate({
         model: 'googleai/imagen-2',
-        prompt: `Create a single, highly detailed, cinematic, and dramatic image that visually represents the following story. Focus on a key moment or the overall mood of the narrative. Avoid text or overlays.
-
-Story:
-${script}`,
+        prompt: imagePrompt,
         config: {
           aspectRatio: '9:16',
         },
@@ -109,12 +116,20 @@ ${script}`,
       audioUrl,
     };
   } catch (e: any) {
-    console.error(e);
-    // Provide a more user-friendly error message.
-    const message =
-      e.message?.includes('FETCH_ERROR') || e.message?.includes('Not Found')
-        ? 'An underlying AI model is currently unavailable. Please try again later.'
-        : e.message || 'An unknown error occurred.';
+    console.error('Full error in generateStory:', e);
+    
+    // Provide a more user-friendly error message, but log the full error.
+    let message = 'An unknown error occurred during generation.';
+    if (e.message) {
+        if (e.message.includes('v1beta')) {
+             message = `An AI model required by the application is not available. Please try again later. (Details: ${e.message})`;
+        } else if (e.message.includes('FETCH_ERROR') || e.message.includes('Not Found')) {
+            message = 'An underlying AI model is currently unavailable. Please try again later.';
+        } else {
+            message = e.message;
+        }
+    }
+    
     return {
       error: message,
     };
