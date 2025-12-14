@@ -9,7 +9,6 @@ import { z } from "zod";
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
-  visualUrl: string;
   error?: never;
 };
 
@@ -17,11 +16,7 @@ export type StoryGenerationError = {
   error: string;
 };
 
-// Define the schema for the structured response from the main AI call
-const StoryGenSchema = z.object({
-  script: z.string().describe("The short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions."),
-  imagePrompt: z.string().describe("A prompt for an image generation model, creating a cinematic, surreal, meme-worthy image for the script."),
-});
+const ScriptSchema = z.string().describe("A short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions.");
 
 
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
@@ -30,30 +25,25 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // 1. Generate script and image prompt in a single, structured call.
-    const structuredResponse = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash'),
-      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a JSON object containing a 'script' and an 'imagePrompt'. The script should be a very short, absurd, single-paragraph story. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. The imagePrompt should be a descriptive prompt for an image generation model to create a cinematic, surreal, meme-worthy image representing the script. User Prompt: ${prompt}`,
-      output: {
-        schema: StoryGenSchema,
-      },
+    const scriptGen = ai.generate({
+        model: googleAI.model('gemini-2.5-flash'),
+        prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script. The script should be a very short, absurd, single-paragraph story. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. User Prompt: ${prompt}`,
+        output: {
+          schema: ScriptSchema,
+        },
     });
+
+    const [scriptResponse] = await Promise.all([scriptGen]);
     
-    const storyData = structuredResponse.output;
+    let script = scriptResponse.output;
 
-    if (!storyData || !storyData.script || !storyData.imagePrompt) {
-      throw new Error('Failed to generate structured story data.');
+    if (!script) {
+        throw new Error('Failed to generate script.');
     }
+    
+    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    let script = storyData.script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
-
-    // 2. Generate image and audio in parallel using the structured data.
-    const [imageResponse, audioResponse] = await Promise.all([
-      ai.generate({
-        model: googleAI.model('imagen-4.0-fast-generate-001'),
-        prompt: storyData.imagePrompt,
-      }),
-      ai.generate({
+    const audioResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
           responseModalities: ['AUDIO'],
@@ -64,14 +54,8 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
           },
         },
         prompt: script,
-      })
-    ]);
+    });
     
-    const visualMedia = imageResponse.media;
-    if (!visualMedia?.url) {
-        throw new Error('Failed to generate visual.');
-    }
-    const visualUrl = visualMedia.url;
 
     const audioMedia = audioResponse.media;
     if (!audioMedia?.url) {
@@ -89,7 +73,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     return { 
       script,
       audioUrl,
-      visualUrl,
     };
 
   } catch (e: any) {
