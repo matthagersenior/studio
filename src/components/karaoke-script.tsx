@@ -1,5 +1,7 @@
-
 "use client";
+
+// This component is no longer used in story-result.tsx
+// but is kept in case it's needed in the future.
 
 import { useState, useEffect, useMemo, RefObject } from 'react';
 import { ScrollArea } from './ui/scroll-area';

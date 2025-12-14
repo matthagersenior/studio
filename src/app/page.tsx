@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,7 +20,7 @@ const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
 });
 
-type LoadingState = 'idle' | 'generating-script' | 'generating-assets' | 'done';
+type LoadingState = 'idle' | 'generating' | 'done';
 
 export default function Home() {
   const [generationResult, setGenerationResult] = useState<Omit<StoryResultPayload, 'error'> | null>(null);
@@ -51,8 +50,11 @@ export default function Home() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoadingState('generating-script');
+    setLoadingState('generating');
     setGenerationResult(null);
+
+    // Simulate a short delay to give feedback to the user
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const result = await generateStory(values.prompt);
 
@@ -75,7 +77,7 @@ export default function Home() {
     form.reset();
   }
 
-  const isLoading = loadingState.startsWith('generating');
+  const isLoading = loadingState === 'generating';
 
   if (isLoading) {
     return (
@@ -155,4 +157,3 @@ export default function Home() {
     </main>
   );
 }
-
