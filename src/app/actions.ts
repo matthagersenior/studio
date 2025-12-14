@@ -72,12 +72,10 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
+    // Run generation in sequence to avoid rate-limiting
     const script = await generateScript(prompt);
-    
-    const [imageUrl, audioUrl] = await Promise.all([
-        generateImage(prompt, script),
-        generateVoiceover(script),
-    ]);
+    const imageUrl = await generateImage(prompt, script);
+    const audioUrl = await generateVoiceover(script);
     
     return { 
       script,
