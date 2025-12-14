@@ -71,7 +71,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
       }),
       // Image Generation
       ai.generate({
-          model: googleAI.model('imagen-4.0-fast-generate-001'),
+          model: googleAI.model('imagen'),
           prompt: imagePrompt,
       })
     ]);
