@@ -102,7 +102,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     console.error("Full error in generateStory:", e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
 
-    if (String(e).includes('404')) {
+    if (String(e).includes('404') || String(e).includes('model is currently unavailable')) {
       errorMessage = 'An underlying AI model is currently unavailable. Please try again later.';
     } else if (String(e).includes('safety policies')) {
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
