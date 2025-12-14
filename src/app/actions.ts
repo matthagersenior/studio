@@ -8,7 +8,7 @@ export type StoryResultPayload = {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
-  imageUrl?: string; // Keep imageUrl for context, even if video is the primary visual
+  imageUrl?: string; // This will be the initial still image
   error?: never;
 };
 
@@ -28,10 +28,10 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateInitialImage(prompt: string): Promise<string> {
+async function generateInitialImage(script: string): Promise<string> {
     const { media } = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a cinematic, surreal, and meme-worthy animated still image based on this script: "${prompt}". The style should be dramatic, high-energy, and slightly absurd.`,
+        prompt: `Create a cinematic, surreal, and meme-worthy animated still image based on this script: "${script}". The style should be dramatic, high-energy, and slightly absurd.`,
     });
 
     if (!media.url) {
@@ -82,6 +82,7 @@ async function generateVideoFromImage(imageUrl: string, script: string): Promise
         throw new Error('Generated video content could not be found.');
     }
 
+    // The URL from Veo is temporary and needs to be fetched and re-encoded.
     const fetch = (await import('node-fetch')).default;
     const videoDownloadResponse = await fetch(
         `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
@@ -116,6 +117,7 @@ async function generateVoiceover(script: string): Promise<string> {
       throw new Error('Failed to generate voiceover.');
   }
 
+  // The media URL is a base64 data URI for PCM data
   const audioBuffer = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
   const wavBase64 = await toWav(audioBuffer);
 
@@ -129,14 +131,19 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
+    // Step 1: Generate the script.
     const script = await generateScript(prompt);
+
+    // Step 2: Generate the initial still image.
     const imageUrl = await generateInitialImage(script);
 
+    // Step 3: Kick off video and audio generation in parallel.
     const [videoResult, audioResult] = await Promise.allSettled([
       generateVideoFromImage(imageUrl, script), 
       generateVoiceover(script),
     ]);
     
+    // Handle failures
     if (videoResult.status === 'rejected') {
       console.error("Video generation failed:", videoResult.reason);
       throw new Error(`Video generation failed: ${videoResult.reason?.message || 'Unknown error'}`);
@@ -147,10 +154,11 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         throw new Error(`Audio generation failed: ${audioResult.reason?.message || 'Unknown error'}`);
     }
 
+    // Success! Return all the generated assets.
     return { 
       script,
-      imageUrl,
-      videoUrl: videoResult.value,
+      imageUrl, // The initial still image
+      videoUrl: videoResult.value, // The animated video
       audioUrl: audioResult.value,
     };
 
@@ -158,6 +166,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     console.error("Full error in generateStory:", e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
     
+    // Provide more user-friendly error messages for common issues.
     if (String(e.message).includes('404')) {
       errorMessage = 'An underlying AI model is currently unavailable. Please try again later.';
     } else if (String(e.message).includes('safety policies')) {

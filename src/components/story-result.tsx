@@ -10,7 +10,7 @@ interface StoryResultProps {
   script: string;
   videoUrl?: string;
   audioUrl?: string;
-  imageUrl?: string;
+  imageUrl?: string; // No longer used for display, but kept for context if needed
   onReset: () => void;
 }
 
@@ -21,6 +21,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
 
+  // This effect handles loading the media sources into the elements
   useEffect(() => {
     const video = videoRef.current;
     const audio = audioRef.current;
@@ -34,6 +35,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       }
     };
     
+    // Use the audio duration for the karaoke timing
     audio?.addEventListener('loadedmetadata', handleAudioMetadata);
 
     const handleVideoEnd = () => {
@@ -45,6 +47,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       }
     }
 
+    // Loop both video and audio together
     video?.addEventListener('ended', handleVideoEnd);
 
     return () => {
@@ -59,18 +62,23 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     const audio = audioRef.current;
     if (!video || !audio) return;
     
-    if (audio) audio.muted = false;
+    // Unmute the audio element. The video is always muted.
+    audio.muted = false;
 
+    // Start both at the same time
     const videoPromise = video.play();
     const audioPromise = audio.play();
 
     Promise.all([videoPromise, audioPromise]).then(() => {
         setIsPlaying(true);
-        if (isMuted) { // If we started playing but the user intention is muted, mute the audio now.
+        // If the user's intent is to be muted, re-apply the mute state now.
+        if (isMuted) { 
             audio.muted = true;
         }
     }).catch(e => {
         console.error("Media play failed:", e);
+        // Show a helpful message to the user
+        alert("Your browser blocked media from playing automatically. Please click the play button.");
         setIsPlaying(false);
     });
   };
@@ -99,7 +107,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     if(audioRef.current) {
         audioRef.current.muted = newMutedState;
     }
-
+    // If the user is unmuting for the first time, start playback.
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -113,8 +121,8 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
            <video
             ref={videoRef}
             playsInline
-            loop
-            muted // Video is always muted, audio is handled by the separate audio element
+            loop // The video element loops. The 'ended' event handler syncs the audio loop.
+            muted // The <video> is always muted; audio is controlled by the separate <audio> element.
             className="w-full h-full object-cover"
           />
         ) : null }
@@ -128,7 +136,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
           >
             <KaraokeScript
               script={script}
-              mediaRef={audioRef}
+              mediaRef={audioRef} // Karaoke is timed to the audio element
               mediaDuration={mediaDuration}
             />
           </div>
