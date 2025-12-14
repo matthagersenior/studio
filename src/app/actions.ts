@@ -30,7 +30,9 @@ const generateStoryAndImagePrompt = ai.definePrompt({
       prompt: z.string(),
     }),
   },
-  // The output schema is now passed in the prompt call, not here.
+  output: {
+    schema: storyGenerationSchema,
+  },
   prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
 
 Prompt: {{{prompt}}}`,
@@ -61,7 +63,6 @@ export async function generateStory(
       {prompt},
       {
         model: 'googleai/gemini-1.5-pro',
-        output: { schema: storyGenerationSchema }, // Pass the output schema here.
       }
     );
 
