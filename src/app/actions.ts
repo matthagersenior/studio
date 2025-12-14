@@ -63,7 +63,7 @@ export async function generateStory(
     const [imageResult, audioResult] = await Promise.all([
       // Generate the cinematic visual.
       ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
+        model: 'googleai/imagen-2',
         prompt: `Create a single, highly detailed, cinematic, and dramatic image that visually represents the following story. Focus on a key moment or the overall mood of the narrative. Avoid text or overlays.
 
 Story:
@@ -74,7 +74,7 @@ ${script}`,
       }),
       // Generate the voiceover.
       ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
+        model: 'googleai/text-to-speech',
         prompt: script,
         config: {
           responseModalities: ['AUDIO'],
