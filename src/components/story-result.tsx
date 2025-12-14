@@ -14,14 +14,12 @@ import {
 
 interface StoryResultProps {
   script: string;
-  videoUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -29,20 +27,16 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   // Autoplay and setup logic
   useEffect(() => {
     const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video || !audioUrl || !videoUrl) return;
+    if (!audio || !audioUrl) return;
     
     audio.src = audioUrl;
-    video.src = videoUrl;
 
     const attemptPlay = async () => {
       try {
-        // Unmute before playing to ensure audio is heard
         audio.muted = false;
-        video.muted = true; // Video sound is not needed
         setIsMuted(false);
 
-        await Promise.all([audio.play(), video.play()]);
+        await audio.play();
         setIsPlaying(true);
       } catch (error) {
         console.error('Autoplay was prevented:', error);
@@ -63,7 +57,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl, videoUrl]);
+  }, [audioUrl]);
 
 
   useEffect(() => {
@@ -75,21 +69,18 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
 
   const playMedia = () => {
     const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video) return;
+    if (!audio) return;
 
-    Promise.all([audio.play(), video.play()])
+    audio.play()
       .then(() => setIsPlaying(true))
       .catch(e => console.error("Media play failed:", e));
   };
 
   const pauseMedia = () => {
     const audio = audioRef.current;
-    const video = videoRef.current;
-    if (!audio || !video) return;
+    if (!audio) return;
 
     audio.pause();
-    video.pause();
     setIsPlaying(false);
   };
 
@@ -114,14 +105,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          <video
-            ref={videoRef}
-            playsInline
-            autoPlay
-            muted
-            loop
-            className="w-full h-full absolute inset-0 object-cover"
-          />
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 animate-bg-pan"></div>
 
           <audio ref={audioRef} playsInline autoPlay loop />
           
