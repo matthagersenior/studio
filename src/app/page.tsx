@@ -90,7 +90,7 @@ export default function Home() {
                 unoptimized
             />
             <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-            <p className="mt-2 text-sm text-gray-400 font-mono text-center">This can take a minute...</p>
+            <p className="mt-2 text-sm text-gray-400 font-mono text-center">This can take up to 30 seconds...</p>
           </>
         ) : (
            <p>Loading...</p>
@@ -99,7 +99,7 @@ export default function Home() {
     );
   }
 
-  if (generationResult) {
+  if (generationResult && generationResult.imageUrl && generationResult.audioUrl) {
     return (
       <StoryResult
         script={generationResult.script}
