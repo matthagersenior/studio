@@ -11,7 +11,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface StoryResultProps {
@@ -30,7 +29,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
 
   // Slideshow logic
   useEffect(() => {
-    if (imageUrls.length === 0) return;
+    if (imageUrls.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
     }, 2000); // Change image every 2 seconds
@@ -121,13 +120,12 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
           
           <div className="w-full h-full">
             {imageUrls.map((url, index) => (
-                <Image 
-                    key={`${url}-${index}`}
+                <img 
+                    key={`${url.slice(0,20)}-${index}`}
                     src={url}
                     alt="Generated visual"
-                    fill
                     className={cn(
-                        "object-cover animate-kenburns transition-opacity duration-1000 ease-in-out",
+                        "object-cover w-full h-full absolute inset-0 animate-kenburns transition-opacity duration-1000 ease-in-out",
                         index === currentImageIndex ? "opacity-100" : "opacity-0"
                     )}
                 />
