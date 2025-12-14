@@ -99,11 +99,11 @@ export default function Home() {
     );
   }
 
-  if (generationResult && generationResult.imageUrl && generationResult.audioUrl) {
+  if (generationResult && generationResult.imageUrls && generationResult.audioUrl) {
     return (
       <StoryResult
         script={generationResult.script}
-        imageUrl={generationResult.imageUrl}
+        imageUrls={generationResult.imageUrls}
         audioUrl={generationResult.audioUrl}
         onReset={resetApp}
       />

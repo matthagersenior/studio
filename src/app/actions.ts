@@ -6,7 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrl?: string;
+  imageUrls?: string[];
   audioUrl?: string;
   error?: never;
 };
@@ -27,16 +27,20 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateImage(prompt: string, script: string): Promise<string> {
-    const imageResponse = await ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
+async function generateImages(prompt: string, script: string): Promise<string[]> {
+    const imagePromises = Array.from({ length: 4 }, (_, i) => {
+        return ai.generate({
+            model: 'googleai/imagen-4.0-fast-generate-001',
+            prompt: `Frame ${i+1}/4. Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
+        }).then(response => {
+            if (!response.media?.url) {
+                throw new Error(`Image generation for frame ${i+1} failed to return media.`);
+            }
+            return response.media.url;
+        });
     });
-
-    if (!imageResponse.media?.url) {
-        throw new Error('Image generation failed to return media.');
-    }
-    return imageResponse.media.url;
+    
+    return Promise.all(imagePromises);
 }
 
 async function generateVoiceover(script: string): Promise<string> {
@@ -74,14 +78,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    const [imageUrl, audioUrl] = await Promise.all([
-        generateImage(prompt, script),
+    const [imageUrls, audioUrl] = await Promise.all([
+        generateImages(prompt, script),
         generateVoiceover(script),
     ]);
     
     return { 
       script,
-      imageUrl,
+      imageUrls,
       audioUrl,
     };
 

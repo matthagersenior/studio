@@ -11,20 +11,50 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+
+const IMAGE_CHANGE_INTERVAL = 2000; // 2 seconds
 
 interface StoryResultProps {
   script: string;
-  imageUrl: string;
+  imageUrls: string[];
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [isMuted, setIsMuted] = useState(false); // Audio is not muted by default
+  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const slideshowIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Slideshow logic
+  useEffect(() => {
+    const startSlideshow = () => {
+      if (slideshowIntervalRef.current) clearInterval(slideshowIntervalRef.current);
+      slideshowIntervalRef.current = setInterval(() => {
+        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
+      }, IMAGE_CHANGE_INTERVAL);
+    };
+
+    const stopSlideshow = () => {
+      if (slideshowIntervalRef.current) {
+        clearInterval(slideshowIntervalRef.current);
+        slideshowIntervalRef.current = null;
+      }
+    };
+    
+    if (isPlaying) {
+      startSlideshow();
+    } else {
+      stopSlideshow();
+    }
+
+    return () => stopSlideshow();
+  }, [isPlaying, imageUrls.length]);
+
 
   // Autoplay logic
   useEffect(() => {
@@ -40,7 +70,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       } catch (error) {
         console.error('Autoplay was prevented:', error);
         setIsPlaying(false);
-        setIsMuted(true); // Mute if autoplay fails, so user can unmute to start
+        setIsMuted(true); 
       }
     };
     
@@ -54,12 +84,13 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     };
     
     const handleEnded = () => {
-      setIsPlaying(false);
-      // Loop
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().then(() => setIsPlaying(true));
-      }
+        setIsPlaying(false);
+        // Loop
+        if (audioRef.current) {
+          setCurrentImageIndex(0); // Reset slideshow
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().then(() => setIsPlaying(true));
+        }
     };
 
     audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
@@ -69,7 +100,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       audio.removeEventListener('canplaythrough', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioUrl]); // Only depends on audioUrl
+  }, [audioUrl]); 
 
   useEffect(() => {
     if (audioRef.current) {
@@ -101,7 +132,6 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
 
-    // If unmuting and was paused, start playing.
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -113,23 +143,22 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
           <Image 
-            src={imageUrl}
+            key={currentImageIndex}
+            src={imageUrls[currentImageIndex]}
             alt="Generated visual"
             fill
             className="object-cover animate-kenburns"
           />
           <audio ref={audioRef} playsInline />
           
-          <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none flex flex-col justify-end">
-             <div
-              className="w-full text-center text-white font-semibold text-xl md:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-auto"
-            >
-              <KaraokeScript
-                script={script}
-                mediaRef={audioRef}
-                mediaDuration={mediaDuration}
-              />
-            </div>
+          <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
+             <div className="pointer-events-auto text-center text-white font-semibold text-xl md:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <KaraokeScript
+                    script={script}
+                    mediaRef={audioRef}
+                    mediaDuration={mediaDuration}
+                />
+             </div>
           </div>
           
           <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
