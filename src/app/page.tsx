@@ -90,7 +90,7 @@ export default function Home() {
                 unoptimized
             />
             <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-            <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to 30 seconds.</p>
+            <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to a minute.</p>
           </>
         ) : (
            <p>Loading...</p>
@@ -99,11 +99,11 @@ export default function Home() {
     );
   }
 
-  if (generationResult && generationResult.imageUrl && generationResult.audioUrl) {
+  if (generationResult && generationResult.videoUrl && generationResult.audioUrl) {
     return (
       <StoryResult
         script={generationResult.script}
-        imageUrl={generationResult.imageUrl}
+        videoUrl={generationResult.videoUrl}
         audioUrl={generationResult.audioUrl}
         onReset={resetApp}
       />

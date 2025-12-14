@@ -1,12 +1,13 @@
-
 'use server';
 
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
+import { googleAI } from '@genkit-ai/google-genai';
+import { GenerateRequest } from "genkit";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrl: string;
+  videoUrl: string;
   audioUrl: string;
   error?: never;
 };
@@ -26,6 +27,71 @@ async function generateScript(prompt: string): Promise<string> {
   }
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
+
+async function generateImage(prompt: string): Promise<string> {
+    const { media } = await ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Create a single, cinematic, high-quality, vibrant, and slightly surreal image to accompany the following script. The image should be in a vertical 9:16 aspect ratio. Script: "${prompt}"`
+    });
+
+    if (!media?.url) {
+        throw new Error('Failed to generate image.');
+    }
+    return media.url;
+}
+
+async function generateVideo(imageUrl: string, prompt: string): Promise<string> {
+    let { operation } = await ai.generate({
+        model: googleAI.model('veo-2.0-generate-001'),
+        prompt: [
+            { text: `Animate this image in a cinematic, looping style that matches the tone of the script. The video should have subtle but constant motion. Script: "${prompt}"` },
+            { media: { url: imageUrl, contentType: 'image/png' } }
+        ],
+        config: {
+            durationSeconds: 5,
+            aspectRatio: '9:16',
+        }
+    } as GenerateRequest);
+
+    if (!operation) {
+        throw new Error('Expected the model to return an operation for video generation.');
+    }
+
+    // Poll for completion
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before checking again
+        operation = await ai.checkOperation(operation);
+    }
+
+    if (operation.error) {
+        console.error('Video generation failed:', operation.error);
+        throw new Error(`Failed to generate video: ${operation.error.message}`);
+    }
+
+    const videoPart = operation.output?.message?.content.find(p => !!p.media && p.media.contentType === 'video/mp4');
+
+    if (!videoPart?.media?.url) {
+        throw new Error('Generated video content was not found in the operation result.');
+    }
+    
+    // The URL from Veo is temporary and needs to be fetched and converted to a data URI
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set.');
+    }
+    const fetch = (await import('node-fetch')).default;
+    const videoDownloadResponse = await fetch(`${videoPart.media.url}&key=${apiKey}`);
+
+    if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
+        throw new Error(`Failed to download the generated video. Status: ${videoDownloadResponse.status}`);
+    }
+
+    const videoBuffer = await videoDownloadResponse.arrayBuffer();
+    const base64Video = Buffer.from(videoBuffer).toString('base64');
+    
+    return `data:video/mp4;base64,${base64Video}`;
+}
+
 
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
@@ -60,15 +126,21 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
+    // Step 1: Generate Script
     const script = await generateScript(prompt);
     
-    // Generate voiceover and define a reliable placeholder image.
-    const audioUrl = await generateVoiceover(script);
-    const imageUrl = `https://picsum.photos/seed/${Math.random()}/540/960`;
+    // Step 2: Generate Image and Audio in parallel
+    const [imageUrl, audioUrl] = await Promise.all([
+        generateImage(script),
+        generateVoiceover(script)
+    ]);
+    
+    // Step 3: Generate Video from the image
+    const videoUrl = await generateVideo(imageUrl, script);
 
     return { 
       script,
-      imageUrl,
+      videoUrl,
       audioUrl,
     };
 

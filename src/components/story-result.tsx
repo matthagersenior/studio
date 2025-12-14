@@ -11,17 +11,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  imageUrl: string;
+  videoUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -29,36 +29,45 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
   // Autoplay and setup logic
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
-
-    audio.src = audioUrl;
-    audio.loop = true; // Loop the audio
+    const video = videoRef.current;
+    if (!audio || !video || !audioUrl || !videoUrl) return;
     
+    audio.src = audioUrl;
+    video.src = videoUrl;
+    video.loop = true;
+    audio.loop = true;
+
     const attemptPlay = async () => {
       try {
-        await audio.play();
+        await Promise.all([audio.play(), video.play()]);
         setIsPlaying(true);
       } catch (error) {
         console.error('Autoplay was prevented:', error);
         setIsPlaying(false);
-        // If autoplay with sound fails, try again muted. User will have to unmute.
         setIsMuted(true); 
       }
     };
-
+    
+    let canPlayCount = 0;
     const handleCanPlay = () => {
-      if (audio.duration > 0 && isFinite(audio.duration)) {
-        setMediaDuration(audio.duration);
-      }
-      attemptPlay();
+        canPlayCount++;
+        if(canPlayCount === 2){ // both audio and video are ready
+            if (audio.duration > 0 && isFinite(audio.duration)) {
+                setMediaDuration(audio.duration);
+            }
+            attemptPlay();
+        }
     };
     
-    audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    video.addEventListener('canplaythrough', handleCanPlay);
     
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
+      video.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl]);
+  }, [audioUrl, videoUrl]);
+
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -68,13 +77,22 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
   }, [isMuted]);
 
   const playMedia = () => {
-    if (!audioRef.current) return;
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(e => console.error("Media play failed:", e));
+    const audio = audioRef.current;
+    const video = videoRef.current;
+    if (!audio || !video) return;
+
+    Promise.all([audio.play(), video.play()])
+      .then(() => setIsPlaying(true))
+      .catch(e => console.error("Media play failed:", e));
   };
 
   const pauseMedia = () => {
-    if (!audioRef.current) return;
-    audioRef.current.pause();
+    const audio = audioRef.current;
+    const video = videoRef.current;
+    if (!audio || !video) return;
+
+    audio.pause();
+    video.pause();
     setIsPlaying(false);
   };
 
@@ -100,15 +118,11 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          {imageUrl && (
-             <Image 
-                key={imageUrl} // Force re-render on image change to restart animation
-                src={imageUrl}
-                alt="Generated visual"
-                fill
-                className="object-cover w-full h-full animate-kenburns"
+          <video
+            ref={videoRef}
+            playsInline
+            className="object-cover w-full h-full"
             />
-          )}
           <audio ref={audioRef} playsInline />
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
