@@ -22,17 +22,18 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
   try {
     // 1. Generate the script first
-    const scriptResponse = await ai.generate({
+    const scriptPromise = ai.generate({
       prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
     });
-
+    
+    // 2. Generate the script and then the assets in parallel
+    const scriptResponse = await scriptPromise;
     let script = scriptResponse.text;
     if (!script) {
       throw new Error('Failed to generate story script.');
     }
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    // 2. Generate image and audio in parallel
     const [imageResponse, audioResponse] = await Promise.all([
       ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
