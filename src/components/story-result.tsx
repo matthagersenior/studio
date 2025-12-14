@@ -99,6 +99,7 @@ export function StoryResult({ script, audioUrl, imageUrl, onReset }: StoryResult
             fill
             className="object-cover animate-kenburns"
             priority
+            unoptimized
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
