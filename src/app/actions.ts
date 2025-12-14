@@ -30,9 +30,7 @@ const generateStoryAndImagePrompt = ai.definePrompt({
       prompt: z.string(),
     }),
   },
-  output: {
-    schema: storyGenerationSchema,
-  },
+  // The output schema is now passed in the prompt call, not here.
   prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
 
 Prompt: {{{prompt}}}`,
@@ -61,7 +59,10 @@ export async function generateStory(
     // Step 1: Generate the story script and the image prompt in a single call.
     const storyResponse = await generateStoryAndImagePrompt(
       {prompt},
-      {model: 'googleai/gemini-1.5-pro'}
+      {
+        model: 'googleai/gemini-1.5-pro',
+        output: { schema: storyGenerationSchema }, // Pass the output schema here.
+      }
     );
 
     const {script, imagePrompt} = storyResponse;
@@ -124,8 +125,8 @@ export async function generateStory(
     if (e.message) {
         if (e.message.includes('v1beta')) {
              message = `An AI model required by the application is not available. Please try again later. (Details: ${e.message})`;
-        } else if (e.message.includes('FETCH_ERROR') || e.message.includes('Not Found')) {
-            message = 'An underlying AI model is currently unavailable. Please try again later.';
+        } else if (e.message.includes('FETCH_ERROR') || e.message.includes('Not Found') || e.message.includes('Bad Request')) {
+            message = `An AI model returned an error. Please try a different prompt or try again later. Details: ${e.message}`;
         } else {
             message = e.message;
         }
