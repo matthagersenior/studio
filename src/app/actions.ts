@@ -4,6 +4,7 @@
 import { ai } from "@/ai/genkit";
 import { toWav } from "@/lib/wav-converter";
 import { googleAI } from "@genkit-ai/google-genai";
+import { z } from "zod";
 
 export type StoryResultPayload = {
   script: string;
@@ -16,30 +17,41 @@ export type StoryGenerationError = {
   error: string;
 };
 
+// Define the schema for the structured response from the main AI call
+const StoryGenSchema = z.object({
+  script: z.string().describe("The short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions."),
+  imagePrompt: z.string().describe("A prompt for an image generation model, creating a cinematic, surreal, meme-worthy image for the script."),
+});
+
+
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
   }
 
   try {
-    // 1. Generate the script first.
-    const scriptPromise = ai.generate({
-      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
+    // 1. Generate script and image prompt in a single, structured call.
+    const structuredResponse = await ai.generate({
+      model: googleAI.model('gemini-2.5-flash'),
+      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a JSON object containing a 'script' and an 'imagePrompt'. The script should be a very short, absurd, single-paragraph story. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. The imagePrompt should be a descriptive prompt for an image generation model to create a cinematic, surreal, meme-worthy image representing the script. User Prompt: ${prompt}`,
+      output: {
+        schema: StoryGenSchema,
+      },
     });
+    
+    const storyData = structuredResponse.output;
 
-    // Run script generation and wait for its result.
-    const scriptResponse = await scriptPromise;
-    let script = scriptResponse.text;
-    if (!script) {
-      throw new Error('Failed to generate story script.');
+    if (!storyData || !storyData.script || !storyData.imagePrompt) {
+      throw new Error('Failed to generate structured story data.');
     }
-    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    // 2. Generate image and audio in parallel using the script.
+    let script = storyData.script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
+
+    // 2. Generate image and audio in parallel using the structured data.
     const [imageResponse, audioResponse] = await Promise.all([
       ai.generate({
         model: googleAI.model('imagen-4.0-fast-generate-001'),
-        prompt: `A cinematic, surreal, meme-worthy image representing the following script: "${script}"`,
+        prompt: storyData.imagePrompt,
       }),
       ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
