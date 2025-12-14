@@ -28,58 +28,17 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateInitialImage(prompt: string, script: string): Promise<string> {
+async function generateAnimation(prompt: string, script: string): Promise<string> {
     const imageResponse = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
+        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal short, looping animation. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
     });
 
     if (!imageResponse.media?.url) {
-        throw new Error('Initial image generation failed to return media.');
+        throw new Error('Animation generation failed to return media.');
     }
     return imageResponse.media.url;
 }
-
-async function generateVideoFromImage(prompt: string, script: string, imageUrl: string): Promise<string> {
-    let { operation } = await ai.generate({
-        model: googleAI.model('veo-2.0-generate-001'),
-        prompt: [
-            { text: `Animate this image in a chaotic, dramatic, and absurd way, based on the script. Script: ${script}. Original prompt: ${prompt}` },
-            { media: { url: imageUrl, contentType: 'image/png' } },
-        ],
-        config: {
-            durationSeconds: 7, // Generate a 7-second video
-            aspectRatio: '9:16',
-        },
-    });
-
-    if (!operation) {
-        throw new Error('Video generation operation could not be started.');
-    }
-
-    // Poll for completion
-    const pollDeadline = Date.now() + 110000; // 110 seconds from now
-    while (!operation.done && Date.now() < pollDeadline) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        operation = await ai.checkOperation(operation);
-    }
-
-    if (!operation.done) {
-        throw new Error('Video generation timed out after 110 seconds.');
-    }
-
-    if (operation.error) {
-        throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
-
-    const video = operation.output?.message?.content.find(p => !!p.media);
-    if (!video?.media?.url) {
-        throw new Error('Video generation did not return a valid video URL.');
-    }
-
-    return video.media.url;
-}
-
 
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
@@ -116,12 +75,9 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    // First, generate the still image
-    const imageUrl = await generateInitialImage(prompt, script);
-
-    // Now, generate video and audio in parallel
+    // Generate animation and audio in parallel
     const [videoUrl, audioUrl] = await Promise.all([
-        generateVideoFromImage(prompt, script, imageUrl),
+        generateAnimation(prompt, script),
         generateVoiceover(script),
     ]);
     

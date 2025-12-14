@@ -28,7 +28,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     if (video && videoUrl) video.src = videoUrl;
     if (audio && audioUrl) audio.src = audioUrl;
 
-    const sourceToUse = videoUrl && video ? video : audio;
+    const sourceToUse = audio || video; // Prioritize audio for duration as it's the master track
 
     const handleMetadata = () => {
       if (sourceToUse && sourceToUse.duration > 0 && isFinite(sourceToUse.duration)) {
@@ -64,27 +64,26 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     audio.muted = true;
     setIsMuted(true);
 
-    const canPlayVideo = video.readyState >= 3;
-    const canPlayAudio = audio.readyState >= 3;
-
-    if (canPlayVideo && canPlayAudio) {
+    const handleCanPlay = () => {
+      // Check if both media elements are ready before trying to play.
+      if (video.readyState >= 3 && audio.readyState >=3) {
+          attemptPlay();
+          video.removeEventListener('canplaythrough', handleCanPlay);
+          audio.removeEventListener('canplaythrough', handleCanPlay);
+      }
+    };
+    video.addEventListener('canplaythrough', handleCanPlay);
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    
+    // Check initial state in case they are already ready
+    if (video.readyState >= 3 && audio.readyState >=3) {
       attemptPlay();
-    } else {
-      const handleCanPlay = () => {
-        if (video.readyState >=3 && audio.readyState >= 3) {
-            attemptPlay();
-            video.removeEventListener('canplaythrough', handleCanPlay);
-            audio.removeEventListener('canplaythrough', handleCanPlay);
-        }
-      };
-      video.addEventListener('canplaythrough', handleCanPlay);
-      audio.addEventListener('canplaythrough', handleCanPlay);
-      
-      return () => {
-        video.removeEventListener('canplaythrough', handleCanPlay);
-        audio.removeEventListener('canplaythrough', handleCanPlay);
-      };
     }
+    
+    return () => {
+      video.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+    };
   }, [videoUrl, audioUrl]);
 
 
@@ -119,8 +118,10 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if (videoRef.current) videoRef.current.muted = newMutedState;
     if (audioRef.current) audioRef.current.muted = newMutedState;
+
+    // Don't mute the video, as its audio track isn't used
+    // if (videoRef.current) videoRef.current.muted = true; 
 
     if (!newMutedState && !isPlaying) {
         playMedia();
@@ -139,6 +140,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
             src={videoUrl}
             loop
             playsInline
+            muted // Video is always muted, audio comes from the separate audio element
             className="w-full h-full object-cover"
           />
         )}
