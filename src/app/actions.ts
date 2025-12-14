@@ -42,20 +42,33 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script and the image prompt in a single, direct call.
+    // Step 1: Generate the story script and the image prompt in a single call.
+    // We will ask the model to return a JSON string and then parse it.
     const storyResponse = await ai.generate(
         {
           model: 'googleai/gemini-1.5-pro',
-          prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
+          prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc.
+
+Also, create a detailed prompt for an AI image generator to create a visual for this story.
+
+Return ONLY a valid JSON object with two keys: "script" and "imagePrompt".
 
 Prompt: ${prompt}`,
-          output: {
-            schema: storyGenerationSchema,
-          },
         }
       );
       
-    const {script, imagePrompt} = storyResponse.output;
+    // Manually parse the JSON from the text response.
+    let parsedOutput;
+    try {
+        // The model sometimes wraps the JSON in ```json ... ```, so we need to clean that up.
+        const cleanedText = storyResponse.text.replace(/^```json\n?/, '').replace(/```$/, '');
+        parsedOutput = storyGenerationSchema.parse(JSON.parse(cleanedText));
+    } catch (e) {
+        console.error("Failed to parse story generation response:", e);
+        return { error: "The AI failed to return a valid story structure. Please try again."};
+    }
+    
+    const {script, imagePrompt} = parsedOutput;
 
     if (!script || !imagePrompt) {
       return {error: 'Failed to generate a story script or image prompt.'};
