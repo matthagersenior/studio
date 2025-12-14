@@ -8,13 +8,12 @@ import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 
 interface StoryResultProps {
   script: string;
-  videoUrl?: string;
+  videoUrl?: string; // This will be an image URL
   audioUrl?: string;
   onReset: () => void;
 }
 
 export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,36 +21,30 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
 
   // Effect to load media sources and handle metadata
   useEffect(() => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-
-    if (video && videoUrl) video.src = videoUrl;
     if (audio && audioUrl) audio.src = audioUrl;
 
-    const sourceToUse = audio || video; // Prioritize audio for duration as it's the master track
-
     const handleMetadata = () => {
-      if (sourceToUse && sourceToUse.duration > 0 && isFinite(sourceToUse.duration)) {
-        setMediaDuration(sourceToUse.duration);
+      if (audio && audio.duration > 0 && isFinite(audio.duration)) {
+        setMediaDuration(audio.duration);
       }
     };
     
-    sourceToUse?.addEventListener('loadedmetadata', handleMetadata);
+    audio?.addEventListener('loadedmetadata', handleMetadata);
     
     return () => {
-      sourceToUse?.removeEventListener('loadedmetadata', handleMetadata);
+      audio?.removeEventListener('loadedmetadata', handleMetadata);
     };
-  }, [videoUrl, audioUrl]);
+  }, [audioUrl]);
 
   // Autoplay logic
   useEffect(() => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!audio) return;
 
     const attemptPlay = async () => {
         try {
-            await Promise.all([video.play(), audio.play()]);
+            await audio.play();
             setIsPlaying(true);
         } catch (error) {
             console.error('Autoplay was prevented:', error);
@@ -60,49 +53,40 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     };
     
     // Muted autoplay is more likely to succeed
-    video.muted = true;
     audio.muted = true;
     setIsMuted(true);
 
     const handleCanPlay = () => {
-      // Check if both media elements are ready before trying to play.
-      if (video.readyState >= 3 && audio.readyState >=3) {
+      if (audio.readyState >= 3) {
           attemptPlay();
-          video.removeEventListener('canplaythrough', handleCanPlay);
           audio.removeEventListener('canplaythrough', handleCanPlay);
       }
     };
-    video.addEventListener('canplaythrough', handleCanPlay);
     audio.addEventListener('canplaythrough', handleCanPlay);
     
     // Check initial state in case they are already ready
-    if (video.readyState >= 3 && audio.readyState >=3) {
+    if (audio.readyState >= 3) {
       attemptPlay();
     }
     
     return () => {
-      video.removeEventListener('canplaythrough', handleCanPlay);
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [videoUrl, audioUrl]);
+  }, [audioUrl]);
 
 
   const playMedia = () => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!audio) return;
     
-    video.play().catch(e => console.error("Video play failed:", e));
     audio.play().catch(e => console.error("Audio play failed:", e));
     setIsPlaying(true);
   };
 
   const pauseMedia = () => {
-    const video = videoRef.current;
     const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!audio) return;
 
-    video.pause();
     audio.pause();
     setIsPlaying(false);
   };
@@ -120,9 +104,6 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
     setIsMuted(newMutedState);
     if (audioRef.current) audioRef.current.muted = newMutedState;
 
-    // Don't mute the video, as its audio track isn't used
-    // if (videoRef.current) videoRef.current.muted = true; 
-
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -135,13 +116,11 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
         {videoUrl && (
-          <video
-            ref={videoRef}
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={videoUrl}
-            loop
-            playsInline
-            muted // Video is always muted, audio comes from the separate audio element
-            className="w-full h-full object-cover"
+            alt="Generated story visual"
+            className="w-full h-full object-cover animate-kenburns"
           />
         )}
         

@@ -7,7 +7,7 @@ import { googleAI } from '@genkit-ai/google-genai';
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string;
+  videoUrl?: string; // This will be the image URL
   audioUrl?: string;
   error?: never;
 };
@@ -28,14 +28,14 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateAnimation(prompt: string, script: string): Promise<string> {
+async function generateImage(prompt: string, script: string): Promise<string> {
     const imageResponse = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal short, looping animation. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
+        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
     });
 
     if (!imageResponse.media?.url) {
-        throw new Error('Animation generation failed to return media.');
+        throw new Error('Image generation failed to return media.');
     }
     return imageResponse.media.url;
 }
@@ -75,16 +75,16 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    // Generate animation and audio in parallel
-    const [videoUrl, audioUrl] = await Promise.all([
-        generateAnimation(prompt, script),
+    // Generate image and audio in parallel
+    const [imageUrl, audioUrl] = await Promise.all([
+        generateImage(prompt, script),
         generateVoiceover(script),
     ]);
     
     // Success! Return all the generated assets.
     return { 
       script,
-      videoUrl,
+      videoUrl: imageUrl, // Pass the image URL as videoUrl
       audioUrl,
     };
 
