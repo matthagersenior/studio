@@ -13,48 +13,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const IMAGE_CHANGE_INTERVAL = 2000; // 2 seconds
-
 interface StoryResultProps {
   script: string;
-  imageUrls: string[];
+  imageUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const slideshowIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Slideshow logic
-  useEffect(() => {
-    const startSlideshow = () => {
-      if (slideshowIntervalRef.current) clearInterval(slideshowIntervalRef.current);
-      slideshowIntervalRef.current = setInterval(() => {
-        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
-      }, IMAGE_CHANGE_INTERVAL);
-    };
-
-    const stopSlideshow = () => {
-      if (slideshowIntervalRef.current) {
-        clearInterval(slideshowIntervalRef.current);
-        slideshowIntervalRef.current = null;
-      }
-    };
-    
-    if (isPlaying) {
-      startSlideshow();
-    } else {
-      stopSlideshow();
-    }
-
-    return () => stopSlideshow();
-  }, [isPlaying, imageUrls.length]);
-
 
   // Autoplay logic
   useEffect(() => {
@@ -87,7 +57,6 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         setIsPlaying(false);
         // Loop
         if (audioRef.current) {
-          setCurrentImageIndex(0); // Reset slideshow
           audioRef.current.currentTime = 0;
           audioRef.current.play().then(() => setIsPlaying(true));
         }
@@ -143,8 +112,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
           <Image 
-            key={currentImageIndex}
-            src={imageUrls[currentImageIndex]}
+            src={imageUrl}
             alt="Generated visual"
             fill
             className="object-cover animate-kenburns"

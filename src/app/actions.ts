@@ -6,7 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrls?: string[];
+  imageUrl?: string;
   audioUrl?: string;
   error?: never;
 };
@@ -27,20 +27,16 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateImages(prompt: string, script: string): Promise<string[]> {
-    const imagePromises = Array.from({ length: 4 }, (_, i) => {
-        return ai.generate({
-            model: 'googleai/imagen-4.0-fast-generate-001',
-            prompt: `Frame ${i+1}/4. Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
-        }).then(response => {
-            if (!response.media?.url) {
-                throw new Error(`Image generation for frame ${i+1} failed to return media.`);
-            }
-            return response.media.url;
-        });
+async function generateImage(prompt: string, script: string): Promise<string> {
+    const response = await ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
     });
     
-    return Promise.all(imagePromises);
+    if (!response.media?.url) {
+        throw new Error(`Image generation failed to return media.`);
+    }
+    return response.media.url;
 }
 
 async function generateVoiceover(script: string): Promise<string> {
@@ -78,14 +74,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    const [imageUrls, audioUrl] = await Promise.all([
-        generateImages(prompt, script),
+    const [imageUrl, audioUrl] = await Promise.all([
+        generateImage(prompt, script),
         generateVoiceover(script),
     ]);
     
     return { 
       script,
-      imageUrls,
+      imageUrl,
       audioUrl,
     };
 
