@@ -96,6 +96,6 @@
     }
   }
   .animate-kenburns {
-    animation: kenburns-top 7s ease-out both alternate-reverse infinite;
+    animation: kenburns-top 5s ease-out both alternate-reverse infinite;
   }
 }

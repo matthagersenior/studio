@@ -89,7 +89,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     // Generate audio and images in parallel
     const [audioUrl, imageUrls] = await Promise.all([
         generateVoiceover(script),
-        generateImages(prompt, script, 4)
+        generateImages(prompt, script, 4) // Generate 4 images for a slideshow
     ]);
     
     // Success! Return all the generated assets.

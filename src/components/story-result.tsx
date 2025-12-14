@@ -52,7 +52,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
   useEffect(() => {
     if (!imageUrls || imageUrls.length === 0 || mediaDuration === 0 || !isPlaying) return;
 
-    const intervalTime = mediaDuration * 1000 / imageUrls.length;
+    const intervalTime = Math.max(1000, mediaDuration * 1000 / imageUrls.length);
     const interval = setInterval(() => {
       setCurrentImageIndex(prevIndex => (prevIndex + 1) % imageUrls.length);
     }, intervalTime);
@@ -74,7 +74,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         setIsPlaying(true);
     }).catch(e => {
         console.error("Media play failed:", e);
-        alert("Your browser blocked media from playing automatically. Please click the play button.");
+        // Don't alert, just wait for user to click play.
         setIsPlaying(false);
     });
   };
@@ -106,9 +106,25 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
     }
   };
 
+  // Autoplay on mount when ready
+  useEffect(() => {
+    if (audioUrl) {
+      const audio = audioRef.current;
+      const attemptPlay = () => {
+        if(audio && audio.readyState >= 3) {
+            playMedia();
+        }
+      }
+      attemptPlay();
+      audio?.addEventListener('canplay', attemptPlay);
+      return () => audio?.removeEventListener('canplay', attemptPlay);
+    }
+  }, [audioUrl]);
+
+
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      <audio ref={audioRef} muted={isMuted} onCanPlay={() => playMedia()} />
+      <audio ref={audioRef} muted={isMuted} />
 
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
@@ -119,13 +135,13 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
             alt="Generated story visual"
             fill
             className="object-cover animate-kenburns"
+            priority={true}
           />
         )}
         
-        <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
-            className="w-full text-center text-white font-semibold text-lg"
-            style={{ textShadow: '0px 0px 8px rgba(0, 0, 0, 1)' }}
+            className="w-full text-center text-white font-semibold text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
           >
             <KaraokeScript
               script={script}
@@ -142,10 +158,10 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         </div>
 
         <div className="absolute bottom-4 left-4 right-4 flex justify-center items-center z-10 space-x-4">
-          <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full">
+          <Button onClick={handleMuteToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full pointer-events-auto">
             {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </Button>
-          <Button onClick={handlePlayPauseToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12">
+          <Button onClick={handlePlayPauseToggle} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12 pointer-events-auto">
             {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
           </Button>
         </div>
