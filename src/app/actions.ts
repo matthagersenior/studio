@@ -50,6 +50,7 @@ export async function generateStory(
     let parsedOutput;
 
     try {
+      // Clean up potential markdown code fences around the JSON.
       const cleanedText = responseText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
       parsedOutput = storyGenerationSchema.parse(JSON.parse(cleanedText));
     } catch (e: any) {
