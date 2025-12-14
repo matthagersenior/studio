@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview A server action to generate a short story with a script,
