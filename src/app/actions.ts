@@ -4,6 +4,33 @@
  *               a cinematic visual, and a voiceover.
  */
 
+import {genkit, ai} from '@/ai/genkit';
+import {toWav} from '@/lib/audio';
+import {z} from 'zod';
+
+// Define the schema for the story script generation prompt.
+const storyScriptSchema = z.object({
+  script: z
+    .string()
+    .describe('A short, dramatic, engaging story script, between 150 and 200 words. It should have a clear beginning, middle, and end.'),
+});
+
+// Define the prompt for generating the story script.
+const generateStoryPrompt = ai.definePrompt({
+  name: 'generateStoryPrompt',
+  input: {
+    schema: z.object({
+      prompt: z.string(),
+    }),
+  },
+  output: {
+    schema: storyScriptSchema,
+  },
+  prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc.
+
+Prompt: {{{prompt}}}`,
+});
+
 // This is the payload the UI will receive.
 export type StoryResultPayload = {
   script: string;
@@ -20,14 +47,76 @@ export async function generateStory(
   prompt: string
 ): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
-    return { error: 'Prompt cannot be empty.' };
+    return {error: 'Prompt cannot be empty.'};
   }
 
-  // Return static, hardcoded content to prevent AI model errors.
-  return {
-    script:
-      'In a world of broken code, a lone developer fights for a working app. They face down the dreaded "Model Not Found" error, a beast that has consumed countless hours. With one final, desperate act, they remove the source of the pain, finding peace in the quiet stability of a static application. The end.',
-    imageUrl: 'https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif',
-    audioUrl: '', // Audio is disabled.
-  };
+  try {
+    // Step 1: Generate the story script.
+    const storyResponse = await generateStoryPrompt({prompt});
+    const {script} = storyResponse;
+
+    if (!script) {
+      return {error: 'Failed to generate a story script.'};
+    }
+
+    // Step 2: Generate the visual and audio in parallel.
+    const [imageResult, audioResult] = await Promise.all([
+      // Generate the cinematic visual.
+      ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Create a single, highly detailed, cinematic, and dramatic image that visually represents the following story. Focus on a key moment or the overall mood of the narrative. Avoid text or overlays.
+
+Story:
+${script}`,
+        config: {
+          aspectRatio: '9:16',
+        },
+      }),
+      // Generate the voiceover.
+      ai.generate({
+        model: 'googleai/gemini-2.5-flash-preview-tts',
+        prompt: script,
+        config: {
+          responseModalities: ['AUDIO'],
+        },
+      }),
+    ]);
+
+    // Process image result
+    const imageUrl = imageResult.media.url;
+    if (!imageUrl) {
+      return {error: 'Failed to generate a visual.'};
+    }
+
+    // Process audio result
+    const audioMedia = audioResult.media;
+    if (!audioMedia?.url) {
+      return {error: 'Failed to generate a voiceover.'};
+    }
+
+    // The audio is returned as PCM data in a base64 data URI.
+    // We need to convert it to a WAV file to be playable in the browser.
+    const pcmData = Buffer.from(
+      audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
+      'base64'
+    );
+    const wavData = await toWav(pcmData);
+    const audioUrl = `data:audio/wav;base64,${wavData}`;
+
+    return {
+      script,
+      imageUrl,
+      audioUrl,
+    };
+  } catch (e: any) {
+    console.error(e);
+    // Provide a more user-friendly error message.
+    const message =
+      e.message?.includes('FETCH_ERROR') || e.message?.includes('Not Found')
+        ? 'An underlying AI model is currently unavailable. Please try again later.'
+        : e.message || 'An unknown error occurred.';
+    return {
+      error: message,
+    };
+  }
 }

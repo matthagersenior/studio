@@ -53,9 +53,6 @@ export default function Home() {
     setLoadingState('generating');
     setGenerationResult(null);
 
-    // Simulate a short delay to give feedback to the user
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
     const result = await generateStory(values.prompt);
 
     if (result.error) {
