@@ -9,14 +9,11 @@ import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 interface StoryResultProps {
   script: string;
   videoUrl?: string;
-  audioUrl?: string;
-  imageUrl?: string; // No longer used for display, but kept for context if needed
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -24,57 +21,46 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   // This effect handles loading the media sources into the elements
   useEffect(() => {
     const video = videoRef.current;
-    const audio = audioRef.current;
 
     if (video && videoUrl) video.src = videoUrl;
-    if (audio && audioUrl) audio.src = audioUrl;
 
-    const handleAudioMetadata = () => {
-      if (audio && audio.duration > 0 && isFinite(audio.duration)) {
-        setMediaDuration(audio.duration);
+    const handleVideoMetadata = () => {
+      if (video && video.duration > 0 && isFinite(video.duration)) {
+        setMediaDuration(video.duration);
       }
     };
     
-    // Use the audio duration for the karaoke timing
-    audio?.addEventListener('loadedmetadata', handleAudioMetadata);
+    // Use the video duration for the karaoke timing
+    video?.addEventListener('loadedmetadata', handleVideoMetadata);
 
     const handleVideoEnd = () => {
-      if(video && audio) {
+      if(video) {
         video.currentTime = 0;
-        audio.currentTime = 0;
         video.play();
-        audio.play();
       }
     }
 
-    // Loop both video and audio together
+    // Loop the video
     video?.addEventListener('ended', handleVideoEnd);
 
     return () => {
-      audio?.removeEventListener('loadedmetadata', handleAudioMetadata);
+      video?.removeEventListener('loadedmetadata', handleVideoMetadata);
       video?.removeEventListener('ended', handleVideoEnd);
     };
-  }, [videoUrl, audioUrl]);
+  }, [videoUrl]);
 
 
   const playMedia = () => {
     const video = videoRef.current;
-    const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!video) return;
     
-    // Unmute the audio element. The video is always muted.
-    audio.muted = false;
+    video.muted = false;
+    setIsMuted(false);
 
-    // Start both at the same time
     const videoPromise = video.play();
-    const audioPromise = audio.play();
 
-    Promise.all([videoPromise, audioPromise]).then(() => {
+    videoPromise.then(() => {
         setIsPlaying(true);
-        // If the user's intent is to be muted, re-apply the mute state now.
-        if (isMuted) { 
-            audio.muted = true;
-        }
     }).catch(e => {
         console.error("Media play failed:", e);
         // Show a helpful message to the user
@@ -85,11 +71,9 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
 
   const pauseMedia = () => {
     const video = videoRef.current;
-    const audio = audioRef.current;
-    if (!video || !audio) return;
+    if (!video) return;
 
     video.pause();
-    audio.pause();
     setIsPlaying(false);
   };
 
@@ -104,8 +88,8 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if(audioRef.current) {
-        audioRef.current.muted = newMutedState;
+    if(videoRef.current) {
+        videoRef.current.muted = newMutedState;
     }
     // If the user is unmuting for the first time, start playback.
     if (!newMutedState && !isPlaying) {
@@ -121,14 +105,13 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
            <video
             ref={videoRef}
             playsInline
-            loop // The video element loops. The 'ended' event handler syncs the audio loop.
-            muted // The <video> is always muted; audio is controlled by the separate <audio> element.
+            loop
+            muted={isMuted}
             className="w-full h-full object-cover"
+            onCanPlay={() => playMedia()} // Auto-play when ready
           />
         ) : null }
         
-        {audioUrl && <audio ref={audioRef} muted={isMuted} />}
-
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
             className="w-full text-center text-white font-semibold text-lg"
@@ -136,7 +119,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
           >
             <KaraokeScript
               script={script}
-              mediaRef={audioRef} // Karaoke is timed to the audio element
+              mediaRef={videoRef} // Karaoke is timed to the video element
               mediaDuration={mediaDuration}
             />
           </div>
