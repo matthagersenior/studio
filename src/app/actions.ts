@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileoverview A server action to generate a short story with a script,
@@ -6,7 +7,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-import wav from 'wav';
 import {toWav} from '@/lib/audio';
 
 // This is the payload the UI will receive.
@@ -40,6 +40,7 @@ const generateStoryPrompt = ai.definePrompt({
   name: 'generateStoryPrompt',
   input: {schema: GenerateStoryInputSchema},
   output: {schema: GenerateStoryOutputSchema},
+  model: 'gemini-1.5-flash',
   prompt: `
     You are a creative writer who specializes in creating short, dramatic, and slightly absurd "brain rot" style story scripts.
     Based on the user's prompt, create a script that is cringey, dramatic, and meme-worthy.
