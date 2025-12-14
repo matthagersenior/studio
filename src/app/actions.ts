@@ -7,7 +7,7 @@ import { z } from "zod";
 // This is the payload the UI will receive. It is simplified to only include the script and a static imageUrl.
 export type StoryResultPayload = {
   script: string;
-  imageUrl: string; // This will always be a static GIF URL.
+  imageUrl: string; 
   error?: never;
 };
 
@@ -17,7 +17,7 @@ export type StoryGenerationError = {
 
 // A simple schema to ensure the model returns a script.
 const ScriptOutputSchema = z.object({
-    script: z.string().describe("A short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions. The language should be deliberately exaggerated and contain elements of internet culture. Use a dramatic, high-energy tone."),
+    script: z.string().describe("A short, absurd, single-paragraph script. 3-5 sentences long. The language should be deliberately exaggerated and contain elements of internet culture. Use a dramatic, high-energy tone."),
 });
 
 
@@ -67,7 +67,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (String(e).includes('429') || String(e).includes('Too Many Requests') || String(e).includes('quota')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
-    } else if (String(e).includes('404') && String(e).includes('is not found')) {
+    } else if (String(e).includes('404') || String(e).includes('is not found') || String(e).includes('model')) {
         errorMessage = "An underlying AI model is currently unavailable. Please try again later.";
     }
 
