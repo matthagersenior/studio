@@ -25,7 +25,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const scriptPromise = ai.generate({
+    const scriptResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash'),
         prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script. The script should be a very short, absurd, single-paragraph story. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. User Prompt: ${prompt}`,
         output: {
@@ -33,14 +33,12 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         },
     });
 
-    const [scriptResponse] = await Promise.all([scriptPromise]);
-    
     let script = scriptResponse.output;
 
     if (!script) {
         throw new Error('Failed to generate script.');
     }
-    
+
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
     const audioResponse = await ai.generate({
@@ -55,22 +53,22 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         },
         prompt: script,
     });
-    
+
 
     const audioMedia = audioResponse.media;
     if (!audioMedia?.url) {
       throw new Error('Failed to generate voiceover.');
     }
-  
+
     const audioBuffer = Buffer.from(
       audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
       'base64'
     );
-  
+
     const wavBase64 = await toWav(audioBuffer);
     const audioUrl = `data:audio/wav;base64,${wavBase64}`;
 
-    return { 
+    return {
       script,
       audioUrl,
     };
@@ -78,7 +76,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   } catch (e: any) {
     console.error("Full error in generateStory:", e);
     let errorMessage = e.message || 'An unexpected error occurred during generation.';
-    
+
     if (String(e.message).includes('404')) {
       errorMessage = 'An underlying AI model is currently unavailable. Please try again later.';
     } else if (String(e.message).includes('safety policies')) {
@@ -88,7 +86,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     } else if (String(e.message).includes('INVALID_ARGUMENT')) {
         errorMessage = `A technical error occurred during generation: ${e.message}`;
     }
-    
+
     return { error: errorMessage };
   }
 }
