@@ -107,10 +107,9 @@ export function StoryResult({ script, audioUrl, visualUrl, onReset }: StoryResul
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
           {visualUrl && (
-             <img
-                src={visualUrl}
-                alt="Generated visual"
-                className="absolute inset-0 w-full h-full object-cover animate-kenburns"
+             <div
+                style={{ backgroundImage: `url(${visualUrl})` }}
+                className="absolute inset-0 w-full h-full bg-cover bg-center animate-kenburns"
              />
           )}
           
