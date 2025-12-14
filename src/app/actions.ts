@@ -2,10 +2,12 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
+import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string;
+  audioUrl?: string;
+  imageUrls?: string[];
   error?: never;
 };
 
@@ -22,63 +24,57 @@ async function generateScript(prompt: string): Promise<string> {
   if (!script) {
     throw new Error('Failed to generate story script.');
   }
-  // Clean up any bracketed/parenthetical scene directions
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateVideo(prompt: string, script: string): Promise<string> {
-    let { operation } = await ai.generate({
-        model: 'googleai/veo-2.0-generate-001',
-        prompt: `Create a short, looping, chaotic, meme-worthy animated video based on this prompt: "${prompt}". The style should be dramatic, high-energy, and slightly absurd, reflecting the tone of this script: "${script}"`,
-         config: {
-            durationSeconds: 8,
-            aspectRatio: '9:16',
+async function generateVoiceover(script: string): Promise<string> {
+    const { media } = await ai.generate({
+      model: 'googleai/gemini-2.5-flash-preview-tts',
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Algenib' },
+          },
         },
+      },
+      prompt: script,
     });
-
-    if (!operation) {
-        throw new Error('Video generation operation did not start.');
+    
+    if (!media?.url) {
+      throw new Error('Failed to generate voiceover.');
     }
     
-    // Poll for completion
-    let finalOperation = operation;
-    const maxWaitTime = 110000; // Wait for up to 110 seconds
-    const interval = 5000;
-    let waitedTime = 0;
-
-    while (!finalOperation.done && waitedTime < maxWaitTime) {
-        await new Promise(resolve => setTimeout(resolve, interval));
-        waitedTime += interval;
-        finalOperation = await ai.checkOperation(finalOperation);
-    }
+    const audioBuffer = Buffer.from(
+      media.url.substring(media.url.indexOf(',') + 1),
+      'base64'
+    );
     
-    if (!finalOperation.done) {
-        throw new Error('Video generation timed out after 110 seconds.');
-    }
+    const wavBase64 = await toWav(audioBuffer);
+    return `data:audio/wav;base64,${wavBase64}`;
+}
 
-    if (finalOperation.error) {
-        throw new Error(`Video generation failed: ${finalOperation.error.message}`);
-    }
-    
-    const video = finalOperation.output?.message?.content.find((p) => !!p.media);
-    if (!video?.media?.url) {
-        throw new Error('Generated video content could not be found.');
-    }
 
-    // The URL from Veo is temporary and needs to be fetched and re-encoded to be durable.
-    const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(
-        `${video.media.url}&key=${process.env.GEMINI_API_KEY}`
+async function generateImages(prompt: string, script: string, count: number): Promise<string[]> {
+    const imagePrompts = Array.from({ length: count }, (_, i) => 
+        `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. This is scene ${i + 1} of ${count} for a story. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`
     );
 
-    if (!videoDownloadResponse.ok || !videoDownloadResponse.body) {
-        throw new Error(`Failed to download generated video (status: ${videoDownloadResponse.status})`);
-    }
+    const imagePromises = imagePrompts.map(p => ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: p,
+    }));
+    
+    const results = await Promise.all(imagePromises);
 
-    const videoBuffer = await videoDownloadResponse.buffer();
-    const contentType = video.media.contentType || 'video/mp4';
+    const imageUrls = results.map(result => {
+        if (!result.media?.url) {
+            throw new Error('An image generation call failed to return media.');
+        }
+        return result.media.url;
+    });
 
-    return `data:${contentType};base64,${videoBuffer.toString('base64')}`;
+    return imageUrls;
 }
 
 
@@ -88,16 +84,19 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Generate script first, as it's needed for the video prompt
     const script = await generateScript(prompt);
 
-    // Kick off video generation
-    const videoUrl = await generateVideo(prompt, script);
+    // Generate audio and images in parallel
+    const [audioUrl, imageUrls] = await Promise.all([
+        generateVoiceover(script),
+        generateImages(prompt, script, 4)
+    ]);
     
     // Success! Return all the generated assets.
     return { 
       script,
-      videoUrl,
+      audioUrl,
+      imageUrls,
     };
 
   } catch (e: any) {

@@ -5,75 +5,85 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX, Play, Pause } from "lucide-react";
+import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  videoUrl?: string;
+  imageUrls?: string[];
+  audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // This effect handles loading the media sources into the elements
   useEffect(() => {
-    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (audio && audioUrl) audio.src = audioUrl;
 
-    if (video && videoUrl) video.src = videoUrl;
-
-    const handleVideoMetadata = () => {
-      if (video && video.duration > 0 && isFinite(video.duration)) {
-        setMediaDuration(video.duration);
+    const handleAudioMetadata = () => {
+      if (audio && audio.duration > 0 && isFinite(audio.duration)) {
+        setMediaDuration(audio.duration);
       }
     };
     
-    // Use the video duration for the karaoke timing
-    video?.addEventListener('loadedmetadata', handleVideoMetadata);
-
-    const handleVideoEnd = () => {
-      if(video) {
-        video.currentTime = 0;
-        video.play();
+    audio?.addEventListener('loadedmetadata', handleAudioMetadata);
+    
+    const handleAudioEnd = () => {
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play();
       }
-    }
-
-    // Loop the video
-    video?.addEventListener('ended', handleVideoEnd);
+    };
+    audio?.addEventListener('ended', handleAudioEnd);
 
     return () => {
-      video?.removeEventListener('loadedmetadata', handleVideoMetadata);
-      video?.removeEventListener('ended', handleVideoEnd);
+      audio?.removeEventListener('loadedmetadata', handleAudioMetadata);
+      audio?.removeEventListener('ended', handleAudioEnd);
     };
-  }, [videoUrl]);
+  }, [audioUrl]);
+
+  // Slideshow effect
+  useEffect(() => {
+    if (!imageUrls || imageUrls.length === 0 || mediaDuration === 0 || !isPlaying) return;
+
+    const intervalTime = mediaDuration * 1000 / imageUrls.length;
+    const interval = setInterval(() => {
+      setCurrentImageIndex(prevIndex => (prevIndex + 1) % imageUrls.length);
+    }, intervalTime);
+
+    return () => clearInterval(interval);
+  }, [imageUrls, mediaDuration, isPlaying]);
 
 
   const playMedia = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     
-    video.muted = false;
+    audio.muted = false;
     setIsMuted(false);
 
-    const videoPromise = video.play();
+    const audioPromise = audio.play();
 
-    videoPromise.then(() => {
+    audioPromise.then(() => {
         setIsPlaying(true);
     }).catch(e => {
         console.error("Media play failed:", e);
-        // Show a helpful message to the user
         alert("Your browser blocked media from playing automatically. Please click the play button.");
         setIsPlaying(false);
     });
   };
 
   const pauseMedia = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    video.pause();
+    audio.pause();
     setIsPlaying(false);
   };
 
@@ -88,10 +98,9 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if(videoRef.current) {
-        videoRef.current.muted = newMutedState;
+    if(audioRef.current) {
+        audioRef.current.muted = newMutedState;
     }
-    // If the user is unmuting for the first time, start playback.
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -99,18 +108,19 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
+      <audio ref={audioRef} muted={isMuted} onCanPlay={() => playMedia()} />
+
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
-        {videoUrl ? (
-           <video
-            ref={videoRef}
-            playsInline
-            loop
-            muted={isMuted}
-            className="w-full h-full object-cover"
-            onCanPlay={() => playMedia()} // Auto-play when ready
+        {imageUrls && imageUrls.length > 0 && (
+          <Image
+            key={currentImageIndex} // Force re-render on change
+            src={imageUrls[currentImageIndex]}
+            alt="Generated story visual"
+            fill
+            className="object-cover animate-kenburns"
           />
-        ) : null }
+        )}
         
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
            <div
@@ -119,7 +129,7 @@ export function StoryResult({ script, videoUrl, onReset }: StoryResultProps) {
           >
             <KaraokeScript
               script={script}
-              mediaRef={videoRef} // Karaoke is timed to the video element
+              mediaRef={audioRef}
               mediaDuration={mediaDuration}
             />
           </div>
