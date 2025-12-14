@@ -22,19 +22,6 @@ const storyGenerationSchema = z.object({
     ),
 });
 
-// Define the prompt for generating the story and image prompt.
-const generateStoryAndImagePrompt = ai.definePrompt({
-  name: 'generateStoryAndImagePrompt',
-  input: {
-    schema: z.object({
-      prompt: z.string(),
-    }),
-  },
-  prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
-
-Prompt: {{{prompt}}}`,
-});
-
 // This is the payload the UI will receive.
 export type StoryResultPayload = {
   script: string;
@@ -55,18 +42,20 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script and the image prompt in a single call.
-    const storyResponse = await generateStoryAndImagePrompt(
-      {prompt},
-      {
-        model: 'googleai/gemini-1.5-pro',
-        output: {
-          schema: storyGenerationSchema,
-        },
-      }
-    );
+    // Step 1: Generate the story script and the image prompt in a single, direct call.
+    const storyResponse = await ai.generate(
+        {
+          model: 'googleai/gemini-1.5-pro',
+          prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc. Also, create a detailed prompt for an AI image generator to create a visual for this story.
 
-    const {script, imagePrompt} = storyResponse;
+Prompt: ${prompt}`,
+          output: {
+            schema: storyGenerationSchema,
+          },
+        }
+      );
+      
+    const {script, imagePrompt} = storyResponse.output;
 
     if (!script || !imagePrompt) {
       return {error: 'Failed to generate a story script or image prompt.'};
