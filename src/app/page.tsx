@@ -15,6 +15,7 @@ import { StoryResult } from "@/components/story-result";
 import type { StoryResultPayload } from "@/app/actions";
 import { useUser, useAuth } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
+import Image from "next/image";
 
 const formSchema = z.object({
   prompt: z.string().min(10, { message: "Prompt must be at least 10 characters." }).max(500, { message: "Prompt must be 500 characters or less." }),
@@ -81,14 +82,15 @@ export default function Home() {
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
         {loadingState === 'generating' ? (
           <>
-            <img 
+            <Image 
                 src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
                 alt="Now Loading..."
                 width={300}
                 height={300}
+                unoptimized
             />
             <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
-            <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to 30 seconds.</p>
+            <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to a minute.</p>
           </>
         ) : (
            <p>Loading...</p>
@@ -101,7 +103,7 @@ export default function Home() {
     return (
       <StoryResult
         script={generationResult.script}
-        imageUrls={generationResult.imageUrls}
+        videoUrl={generationResult.videoUrl}
         audioUrl={generationResult.audioUrl}
         onReset={resetApp}
       />

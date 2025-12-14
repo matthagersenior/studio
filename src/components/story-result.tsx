@@ -11,17 +11,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 interface StoryResultProps {
   script: string;
-  imageUrls: string[]; // This is now ignored.
+  videoUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -29,14 +29,20 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
   // Autoplay and setup logic
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    const video = videoRef.current;
+    if (!audio || !video || !audioUrl || !videoUrl) return;
     
     audio.src = audioUrl;
-    audio.loop = true;
+    video.src = videoUrl;
 
     const attemptPlay = async () => {
       try {
-        await audio.play();
+        // Unmute before playing to ensure audio is heard
+        audio.muted = false;
+        video.muted = true; // Video sound is not needed
+        setIsMuted(false);
+
+        await Promise.all([audio.play(), video.play()]);
         setIsPlaying(true);
       } catch (error) {
         console.error('Autoplay was prevented:', error);
@@ -52,16 +58,12 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         attemptPlay();
     };
     
-    // 'canplaythrough' event listener
     audio.addEventListener('canplaythrough', handleCanPlay);
-    
-    // Set current time to 0 to ensure it starts from the beginning on re-render/source change
-    audio.currentTime = 0;
     
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl]);
+  }, [audioUrl, videoUrl]);
 
 
   useEffect(() => {
@@ -73,18 +75,21 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
 
   const playMedia = () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    const video = videoRef.current;
+    if (!audio || !video) return;
 
-    audio.play()
+    Promise.all([audio.play(), video.play()])
       .then(() => setIsPlaying(true))
       .catch(e => console.error("Media play failed:", e));
   };
 
   const pauseMedia = () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    const video = videoRef.current;
+    if (!audio || !video) return;
 
     audio.pause();
+    video.pause();
     setIsPlaying(false);
   };
 
@@ -109,11 +114,16 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          <div className="w-full h-full absolute inset-0 animate-bg-pan bg-gradient-to-br from-blue-900 via-purple-900 to-black bg-[size:400%_400%]">
-            {/* Visual content removed, background is now the animation */}
-          </div>
+          <video
+            ref={videoRef}
+            playsInline
+            autoPlay
+            muted
+            loop
+            className="w-full h-full absolute inset-0 object-cover"
+          />
 
-          <audio ref={audioRef} playsInline autoPlay />
+          <audio ref={audioRef} playsInline autoPlay loop />
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
              <div className="pointer-events-auto text-center text-white font-semibold text-xl md:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
