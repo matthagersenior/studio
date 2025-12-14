@@ -6,7 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrls: string[];
+  imageUrl: string;
   audioUrl: string;
   error?: never;
 };
@@ -27,35 +27,18 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateImages(script: string, count: number = 4): Promise<string[]> {
-  const imageUrls: string[] = [];
-  
-  // Generate a base prompt for all images
-  const basePrompt = `A surreal, cinematic, and meme-worthy image that visually represents the following script: ${script}.`;
-
-  // Generate images sequentially to avoid rate limiting
-  for (let i = 0; i < count; i++) {
-    // Add a slight variation for each image to get different results
-    const promptVariation = `${basePrompt} Style variation ${i + 1}.`;
+async function generateImage(script: string): Promise<string> {
+    const prompt = `A surreal, cinematic, and meme-worthy image that visually represents the following script: ${script}.`;
     
     const { media } = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: promptVariation,
+        prompt: prompt,
     });
     
     if (!media?.url) {
-        // If one image fails, we can try to continue or just throw
-        console.warn(`Failed to generate image ${i + 1}.`);
-        continue; // Continue to the next image
+        throw new Error('Failed to generate image.');
     }
-    imageUrls.push(media.url);
-  }
-
-  if (imageUrls.length === 0) {
-    throw new Error('Failed to generate any images.');
-  }
-
-  return imageUrls;
+    return media.url;
 }
 
 async function generateVoiceover(script: string): Promise<string> {
@@ -94,18 +77,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const script = await generateScript(prompt);
     
     // Run image and audio generation in parallel
-    const [imageUrls, audioUrl] = await Promise.all([
-        generateImages(script),
+    const [imageUrl, audioUrl] = await Promise.all([
+        generateImage(script),
         generateVoiceover(script)
     ]);
     
-    if (imageUrls.length === 0) {
-        return { error: 'Image generation failed to produce any results.' };
-    }
-
     return { 
       script,
-      imageUrls,
+      imageUrl,
       audioUrl,
     };
 

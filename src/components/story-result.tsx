@@ -15,19 +15,16 @@ import Image from "next/image";
 
 interface StoryResultProps {
   script: string;
-  imageUrls: string[];
+  imageUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-const IMAGE_CHANGE_INTERVAL = 2000; // 2 seconds
-
-export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Autoplay and setup logic
   useEffect(() => {
@@ -62,26 +59,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl]); 
-
-  // Mute effect
-  useEffect(() => {
-    if (audioRef.current) {
-        audioRef.current.muted = isMuted;
-    }
-  }, [isMuted]);
-
-  // Image slideshow logic
-  useEffect(() => {
-    if (!isPlaying || imageUrls.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
-    }, IMAGE_CHANGE_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, imageUrls.length]);
-
+  }, [audioUrl, isMuted]); // depend on isMuted
 
   const playMedia = () => {
     if (!audioRef.current) return;
@@ -105,22 +83,24 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
+    if(audioRef.current) {
+        audioRef.current.muted = newMutedState;
+    }
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
   };
 
-  const currentImageUrl = imageUrls[currentImageIndex];
 
   return (
     <TooltipProvider>
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          {currentImageUrl && (
+          {imageUrl && (
              <Image 
-                key={currentImageUrl} // Force re-render on image change to restart animation
-                src={currentImageUrl}
+                key={imageUrl} // Force re-render on image change to restart animation
+                src={imageUrl}
                 alt="Generated visual"
                 fill
                 className="object-cover w-full h-full animate-kenburns"
