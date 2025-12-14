@@ -6,7 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrl: string;
+  imageUrls: string[];
   audioUrl: string;
   error?: never;
 };
@@ -63,12 +63,14 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     const { script, audioUrl } = await generateScriptAndVoice(prompt);
     
     // Using a reliable placeholder image to avoid model errors
-    const seed = Math.random();
-    const imageUrl = `https://picsum.photos/seed/${seed}/540/960`;
+    const imageUrls = Array.from({ length: 4 }, (_, i) => {
+        const seed = Math.random() + i;
+        return `https://picsum.photos/seed/${seed}/540/960`
+    });
 
     return { 
       script,
-      imageUrl,
+      imageUrls,
       audioUrl,
     };
 

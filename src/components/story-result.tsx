@@ -12,19 +12,31 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface StoryResultProps {
   script: string;
-  imageUrl: string;
+  imageUrls: string[];
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Slideshow logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
+    }, 2000); // Change image every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [imageUrls.length]);
+
 
   // Autoplay and setup logic
   useEffect(() => {
@@ -106,14 +118,21 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          {imageUrl && (
-            <Image 
-                src={imageUrl}
-                alt="Generated visual"
-                fill
-                className="object-cover animate-kenburns"
-            />
-          )}
+          <div className="w-full h-full">
+            {imageUrls.map((url, index) => (
+                <Image 
+                    key={url}
+                    src={url}
+                    alt="Generated visual"
+                    fill
+                    className={cn(
+                        "object-cover animate-kenburns transition-opacity duration-1000 ease-in-out",
+                        index === currentImageIndex ? "opacity-100" : "opacity-0"
+                    )}
+                />
+            ))}
+          </div>
+
           <audio ref={audioRef} playsInline />
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
