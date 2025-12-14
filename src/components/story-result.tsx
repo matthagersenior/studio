@@ -41,11 +41,10 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       } catch (error) {
         console.error('Autoplay was prevented:', error);
         setIsPlaying(false);
+        // If autoplay with sound fails, try again muted.
         setIsMuted(true); 
       }
     };
-    
-    audio.muted = isMuted;
 
     const handleCanPlay = () => {
       if (audio.duration > 0 && isFinite(audio.duration)) {
@@ -59,7 +58,14 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-  }, [audioUrl, isMuted]); // depend on isMuted
+  }, [audioUrl]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.muted = isMuted;
+    }
+  }, [isMuted]);
 
   const playMedia = () => {
     if (!audioRef.current) return;
@@ -83,9 +89,6 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if(audioRef.current) {
-        audioRef.current.muted = newMutedState;
-    }
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
