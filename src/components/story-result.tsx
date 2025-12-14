@@ -41,7 +41,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       } catch (error) {
         console.error('Autoplay was prevented:', error);
         setIsPlaying(false);
-        // If autoplay with sound fails, try again muted.
+        // If autoplay with sound fails, try again muted. User will have to unmute.
         setIsMuted(true); 
       }
     };

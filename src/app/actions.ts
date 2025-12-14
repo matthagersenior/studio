@@ -62,11 +62,8 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    // Use a reliable placeholder image and run audio generation in parallel.
-    const [audioUrl] = await Promise.all([
-        generateVoiceover(script)
-    ]);
-    
+    // Generate voiceover and define a reliable placeholder image.
+    const audioUrl = await generateVoiceover(script);
     const imageUrl = `https://picsum.photos/seed/${Math.random()}/540/960`;
 
     return { 
