@@ -54,6 +54,22 @@ async function generateScriptAndVoice(prompt: string): Promise<{ script: string;
   return { script, audioUrl };
 }
 
+async function generateImage(script: string): Promise<string> {
+    const imageResponse = await ai.generate({
+      model: 'googleai/imagen-4.0-fast-generate-001',
+      prompt: `Create a single, cinematic, absurd, and meme-worthy image to accompany the following script. The style should be surreal, high-energy, and slightly cursed. Match the chaotic tone of the script. Do not include any text in the image. Script: "${script}"`,
+      config: {
+        aspectRatio: '9:16',
+      },
+    });
+
+    const imageUrl = imageResponse.media?.url;
+    if (!imageUrl) {
+        throw new Error('Failed to generate image.');
+    }
+    return imageUrl;
+}
+
 export async function generateStory(prompt: string): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
     return { error: 'Prompt cannot be empty.' };
@@ -61,12 +77,10 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
 
   try {
     const { script, audioUrl } = await generateScriptAndVoice(prompt);
+    const imageUrl = await generateImage(script);
     
-    // Using a reliable placeholder image to avoid model errors
-    const imageUrls = Array.from({ length: 4 }, (_, i) => {
-        const seed = Math.random() + i;
-        return `https://picsum.photos/seed/${seed}/540/960`
-    });
+    // Create an array with the same image repeated to feed the slideshow component
+    const imageUrls = Array(4).fill(imageUrl);
 
     return { 
       script,
