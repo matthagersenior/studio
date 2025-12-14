@@ -2,7 +2,6 @@
 'use server';
 
 import { ai } from "@/ai/genkit";
-import { googleAI } from "@genkit-ai/google-genai";
 import { z } from "zod";
 
 // This is the payload the UI will receive. It is simplified to only include the script and a static imageUrl.
@@ -34,7 +33,6 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     // A single, reliable AI call to generate the script.
     const scriptResult = await ai.generate({
-        model: googleAI.model('gemini-1.5-flash'),
         prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script for a short video.
   
         User Prompt: ${prompt}`,
@@ -69,7 +67,10 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         errorMessage = "The prompt could not be submitted as it may violate safety policies. Please rephrase your prompt.";
     } else if (String(e).includes('429') || String(e).includes('Too Many Requests') || String(e).includes('quota')) {
         errorMessage = "The generator is currently under high demand. Please try again in a few moments.";
+    } else if (String(e).includes('404') && String(e).includes('is not found')) {
+        errorMessage = "An underlying AI model is currently unavailable. Please try again later.";
     }
+
 
     return { error: errorMessage };
   }
