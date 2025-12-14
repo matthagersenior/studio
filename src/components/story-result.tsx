@@ -111,12 +111,14 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          <Image 
-            src={imageUrl}
-            alt="Generated visual"
-            fill
-            className="object-cover animate-kenburns"
-          />
+          {imageUrl && (
+            <Image 
+                src={imageUrl}
+                alt="Generated visual"
+                fill
+                className="object-cover animate-kenburns"
+            />
+          )}
           <audio ref={audioRef} playsInline />
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">

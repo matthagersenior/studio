@@ -27,18 +27,6 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateImage(prompt: string, script: string): Promise<string> {
-    const response = await ai.generate({
-        model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `Create a chaotic, meme-worthy, absurd, dramatic, high-energy, and slightly surreal image. Style: animated, digital art. Prompt: "${prompt}". Script context: "${script}"`,
-    });
-    
-    if (!response.media?.url) {
-        throw new Error(`Image generation failed to return media.`);
-    }
-    return response.media.url;
-}
-
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
@@ -72,9 +60,12 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    // Run generation in sequence to avoid rate-limiting
     const script = await generateScript(prompt);
-    const imageUrl = await generateImage(prompt, script);
+    
+    // Generate a placeholder image URL
+    const imageUrl = `https://picsum.photos/seed/${Math.random()}/540/960`;
+    
+    // Run voiceover generation
     const audioUrl = await generateVoiceover(script);
     
     return { 
