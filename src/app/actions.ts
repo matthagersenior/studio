@@ -8,7 +8,7 @@ import { MediaPart } from "genkit";
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string; 
+  imageUrl?: string;
   audioUrl?: string;
   error?: never;
 };
@@ -40,50 +40,6 @@ async function generateImage(prompt: string, script: string): Promise<MediaPart>
     }
     return imageResponse.media;
 }
-
-
-async function generateVideoFromImage(image: MediaPart): Promise<string> {
-  let { operation } = await ai.generate({
-    model: 'googleai/veo-2.0-generate-001',
-    prompt: [
-      { text: 'Make this image move in a subtle, looping, chaotic, and meme-worthy way.' },
-      { media: { url: image.url, contentType: image.contentType || 'image/png' } },
-    ],
-    config: {
-      durationSeconds: 6,
-      aspectRatio: '9:16',
-    },
-  });
-
-  if (!operation) {
-    throw new Error('Expected the model to return an operation for video generation.');
-  }
-
-  // Poll for completion
-  let pollCount = 0;
-  const maxPolls = 20; // 20 * 5s = 100s total wait time
-  while (!operation.done && pollCount < maxPolls) {
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    operation = await ai.checkOperation(operation);
-    pollCount++;
-  }
-
-  if (!operation.done) {
-    throw new Error('Video generation timed out after 100 seconds.');
-  }
-
-  if (operation.error) {
-    throw new Error(`Video generation failed: ${operation.error.message}`);
-  }
-
-  const video = operation.output?.message?.content.find((p) => !!p.media);
-  if (!video || !video.media?.url) {
-    throw new Error('Failed to find the generated video in the operation result.');
-  }
-
-  return video.media.url;
-}
-
 
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
@@ -120,18 +76,16 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    const image = await generateImage(prompt, script);
-
-    // Generate video and audio in parallel
-    const [videoUrl, audioUrl] = await Promise.all([
-        generateVideoFromImage(image),
+    // Generate image and audio in parallel
+    const [image, audioUrl] = await Promise.all([
+        generateImage(prompt, script),
         generateVoiceover(script),
     ]);
     
     // Success! Return all the generated assets.
     return { 
       script,
-      videoUrl,
+      imageUrl: image.url,
       audioUrl,
     };
 

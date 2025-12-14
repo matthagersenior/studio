@@ -11,94 +11,81 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import Image from "next/image";
 
 
 interface StoryResultProps {
   script: string;
-  videoUrl?: string;
+  imageUrl?: string;
   audioUrl?: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(false); // Do not mute by default
+export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
 
-  // Effect to load media sources and handle metadata
+  // Autoplay logic - attempts to play audio when component can play
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    
-    if (videoUrl) video.src = videoUrl;
-    if (audioUrl) {
-      // If there's a separate audio URL, we can create an Audio object to play alongside
-      // But for veo-generated video with audio, this is not needed.
-      // For simplicity with VEO, we'll assume audio is baked in.
-      // If audio is separate, we need a separate audio element.
-    }
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
 
-    const handleMetadata = () => {
-      if (video && video.duration > 0 && isFinite(video.duration)) {
-        setMediaDuration(video.duration);
-      }
-    };
-    
-    video.addEventListener('loadedmetadata', handleMetadata);
-    
-    return () => {
-      video.removeEventListener('loadedmetadata', handleMetadata);
-    };
-  }, [videoUrl, audioUrl]);
-
-  // Autoplay logic
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    audio.src = audioUrl;
 
     const attemptPlay = async () => {
         try {
-            await video.play();
+            await audio.play();
             setIsPlaying(true);
         } catch (error) {
             console.error('Autoplay was prevented:', error);
-            setIsPlaying(false); 
-            // If autoplay with sound fails, we can try muted autoplay
-            video.muted = true;
-            setIsMuted(true);
-            video.play().then(() => setIsPlaying(true)).catch(e => console.error("Muted autoplay failed too", e));
+            setIsPlaying(false);
+            // If autoplay with sound fails, we don't force mute.
+            // The user must interact to start playback.
         }
     };
     
-    // We don't set video.muted = true here anymore. Let's try unmuted first.
-    video.muted = isMuted;
+    audio.muted = isMuted;
 
     const handleCanPlay = () => {
-        attemptPlay();
+      if (audio.duration > 0 && isFinite(audio.duration)) {
+          setMediaDuration(audio.duration);
+      }
+      attemptPlay();
+    };
+    
+    const handleEnded = () => {
+        setIsPlaying(false);
+        // Optional: loop
+        if(audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().then(() => setIsPlaying(true));
+        }
     };
 
-    video.addEventListener('canplaythrough', handleCanPlay, { once: true });
+    audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
+    audio.addEventListener('ended', handleEnded);
     
     return () => {
-      video.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('ended', handleEnded);
     };
-  }, [videoUrl, isMuted]); // Depend on isMuted to re-trigger if user unmutes.
+  }, [audioUrl, isMuted]);
 
 
   const playMedia = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     
-    video.play().catch(e => console.error("Video play failed:", e));
-    setIsPlaying(true);
+    audio.play().then(() => setIsPlaying(true)).catch(e => console.error("Audio play failed:", e));
   };
 
   const pauseMedia = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    video.pause();
+    audio.pause();
     setIsPlaying(false);
   };
 
@@ -113,7 +100,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   const handleMuteToggle = () => {
     const newMutedState = !isMuted;
     setIsMuted(newMutedState);
-    if (videoRef.current) videoRef.current.muted = newMutedState;
+    if (audioRef.current) audioRef.current.muted = newMutedState;
 
     if (!newMutedState && !isPlaying) {
         playMedia();
@@ -121,12 +108,10 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
   };
 
   const handleDownload = () => {
-    if (videoUrl) {
+    if (imageUrl) {
       const a = document.createElement('a');
-      a.href = videoUrl;
-      // VEO urls don't have extensions, so we need to add one.
-      // It's an MP4.
-      a.download = `brain-rot-${Date.now()}.mp4`; 
+      a.href = imageUrl;
+      a.download = `brain-rot-image-${Date.now()}.png`; 
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -138,13 +123,14 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          {videoUrl && (
-             <video
-                ref={videoRef}
-                src={videoUrl}
-                playsInline
-                loop
-                className="w-full h-full object-cover"
+          <audio ref={audioRef} playsInline />
+
+          {imageUrl && (
+             <Image
+                src={imageUrl}
+                alt="Generated story visual"
+                fill
+                className={`w-full h-full object-cover transition-transform duration-[5s] ease-out ${isPlaying ? 'animate-kenburns' : ''}`}
             />
           )}
           
@@ -154,7 +140,7 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
             >
               <KaraokeScript
                 script={script}
-                mediaRef={videoRef}
+                mediaRef={audioRef}
                 mediaDuration={mediaDuration}
               />
             </div>
@@ -184,12 +170,12 @@ export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResult
             
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button onClick={handleDownload} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full pointer-events-auto" disabled={!videoUrl}>
+                <Button onClick={handleDownload} size="icon" className="bg-black/50 hover:bg-black/70 text-white rounded-full pointer-events-auto" disabled={!imageUrl}>
                   <Download size={20} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Download Video</p>
+                <p>Download Image</p>
               </TooltipContent>
             </Tooltip>
           </div>
