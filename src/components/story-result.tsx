@@ -15,10 +15,11 @@ import {
 interface StoryResultProps {
   script: string;
   audioUrl: string;
+  visualUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, audioUrl, visualUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -105,7 +106,16 @@ export function StoryResult({ script, audioUrl, onReset }: StoryResultProps) {
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 animate-bg-pan"></div>
+          {visualUrl && (
+             <img
+                src={visualUrl}
+                alt="Generated visual"
+                className="absolute inset-0 w-full h-full object-cover animate-kenburns"
+             />
+          )}
+          
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+
 
           <audio ref={audioRef} playsInline autoPlay loop />
           

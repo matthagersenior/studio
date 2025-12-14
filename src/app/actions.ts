@@ -7,6 +7,7 @@ import { toWav } from "@/lib/wav-converter";
 export type StoryResultPayload = {
   script: string;
   audioUrl: string;
+  visualUrl: string;
   error?: never;
 };
 
@@ -20,55 +21,49 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const [scriptResponse, audioGenPromise] = await Promise.all([
-      ai.generate({
-        prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
-      }),
-      (async () => {
-        // This is a temporary script just to get a voice config. We will replace it.
-        const tempScript = "Hello there!";
-        const { media } = await ai.generate({
-            model: 'googleai/gemini-2.5-flash-preview-tts',
-            config: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Algenib' },
-                    },
-                },
-            },
-            prompt: tempScript,
-        });
-        return media;
-      })()
-    ]);
-    
+    // 1. Generate the script first
+    const scriptResponse = await ai.generate({
+      prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Write a very short, absurd, single-paragraph script based on the user's prompt. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. Prompt: ${prompt}`,
+    });
+
     let script = scriptResponse.text;
     if (!script) {
       throw new Error('Failed to generate story script.');
     }
     script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 
-    // Now generate the actual audio with the final script
-    const { media } = await ai.generate({
+    // 2. Generate image and audio in parallel
+    const [imageResponse, audioResponse] = await Promise.all([
+      ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `Create a single, cinematic, highly detailed, visually striking image that captures the essence of this script: "${script}". The style should be surreal, slightly distorted, and meme-worthy.`,
+      }),
+      ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Algenib' },
-                },
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Algenib' },
             },
+          },
         },
         prompt: script,
-    });
-  
-    if (!media?.url) {
+      })
+    ]);
+
+    const visualUrl = imageResponse.media?.url;
+    if (!visualUrl) {
+      throw new Error('Failed to generate visual.');
+    }
+
+    const audioMedia = audioResponse.media;
+    if (!audioMedia?.url) {
       throw new Error('Failed to generate voiceover.');
     }
   
     const audioBuffer = Buffer.from(
-      media.url.substring(media.url.indexOf(',') + 1),
+      audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
       'base64'
     );
   
@@ -78,6 +73,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     return { 
       script,
       audioUrl,
+      visualUrl,
     };
 
   } catch (e: any) {
