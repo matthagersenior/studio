@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 interface StoryResultProps {
   script: string;
-  imageUrls: string[];
+  imageUrls: string[]; // This is now ignored.
   audioUrl: string;
   onReset: () => void;
 }
@@ -23,20 +23,8 @@ interface StoryResultProps {
 export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [mediaDuration, setMediaDuration] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  // Slideshow logic
-  useEffect(() => {
-    if (imageUrls.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageUrls.length);
-    }, 2000); // Change image every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [imageUrls.length]);
-
 
   // Autoplay and setup logic
   useEffect(() => {
@@ -64,7 +52,11 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         attemptPlay();
     };
     
+    // 'canplaythrough' event listener
     audio.addEventListener('canplaythrough', handleCanPlay);
+    
+    // Set current time to 0 to ensure it starts from the beginning on re-render/source change
+    audio.currentTime = 0;
     
     return () => {
       audio.removeEventListener('canplaythrough', handleCanPlay);
@@ -112,27 +104,16 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
     }
   };
 
-
   return (
     <TooltipProvider>
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          <div className="w-full h-full">
-            {imageUrls.map((url, index) => (
-                <img 
-                    key={`${url.slice(0,20)}-${index}`}
-                    src={url}
-                    alt="Generated visual"
-                    className={cn(
-                        "object-cover w-full h-full absolute inset-0 animate-kenburns transition-opacity duration-1000 ease-in-out",
-                        index === currentImageIndex ? "opacity-100" : "opacity-0"
-                    )}
-                />
-            ))}
+          <div className="w-full h-full absolute inset-0 animate-bg-pan bg-gradient-to-br from-blue-900 via-purple-900 to-black bg-[size:400%_400%]">
+            {/* Visual content removed, background is now the animation */}
           </div>
 
-          <audio ref={audioRef} playsInline />
+          <audio ref={audioRef} playsInline autoPlay />
           
           <div className="absolute inset-x-0 bottom-0 h-2/5 p-4 md:p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end">
              <div className="pointer-events-auto text-center text-white font-semibold text-xl md:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
