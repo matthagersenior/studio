@@ -9,15 +9,12 @@ import { ai } from '@/ai/genkit';
 import { toWav } from '@/lib/audio';
 import { z } from 'zod';
 
-// Define the schema for the structured story generation.
-// This will be used to validate the data we parse from the model's text response.
 const storyGenerationSchema = z.object({
   script: z
     .string()
     .describe('A short, dramatic, engaging story script, between 150 and 200 words. It should have a clear beginning, middle, and end.'),
 });
 
-// This is the payload the UI will receive.
 export type StoryResultPayload = {
   script: string;
   imageUrl: string;
@@ -37,25 +34,22 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script.
-    // We ask the model to return a JSON object as a string, which is more reliable
-    // than using complex output schemas that have been causing issues.
+    // Step 1: Generate the story script using a more stable method.
     const storyResponse = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
-        prompt: `You are a master storyteller. Based on the prompt below, create a short, dramatic, and engaging story script.
+      model: 'googleai/gemini-1.5-flash',
+      prompt: `You are a master storyteller. Based on the prompt below, create a short, dramatic, and engaging story script.
 
-        Return ONLY a single, valid JSON object with one key: "script".
+      Return ONLY a single, valid JSON object with one key: "script".
 
-        Do not wrap the JSON in markdown (e.g. \`\`\`json) or any other characters.
+      Do not wrap the JSON in markdown (e.g. \`\`\`json) or any other characters.
 
-        Prompt: "${prompt}"`,
+      Prompt: "${prompt}"`,
     });
-
+    
     const responseText = storyResponse.text;
     let parsedOutput;
 
     try {
-      // The model might still occasionally wrap the output in ```json ... ```, so we clean it.
       const cleanedText = responseText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
       parsedOutput = storyGenerationSchema.parse(JSON.parse(cleanedText));
     } catch (e: any) {
@@ -69,10 +63,8 @@ export async function generateStory(
       return { error: 'Failed to generate a valid story script.' };
     }
 
-    // Step 2: Generate the audio and image in parallel.
-    // For stability, we use a reliable placeholder image service instead of a generative model.
+    // Step 2: Generate audio and image in parallel.
     const [audioResult] = await Promise.all([
-      // Generate the voiceover from the script.
       ai.generate({
         model: 'googleai/text-to-speech',
         prompt: script,
@@ -82,10 +74,8 @@ export async function generateStory(
       }),
     ]);
     
-    // Using a stable placeholder image service to avoid model failures and ensure a visual is always present.
-    // The seed is based on the current time to get a different image for each generation.
+    // For stability, use a reliable placeholder image service.
     const imageUrl = `https://picsum.photos/seed/${Date.now()}/540/960`;
-
 
     // Process audio result
     const audioMedia = audioResult.media;
@@ -93,8 +83,6 @@ export async function generateStory(
       return { error: 'Failed to generate the voiceover for the story.' };
     }
 
-    // The audio is returned as raw PCM data in a base64 data URI.
-    // We need to convert it to a WAV file so it can be played in the browser.
     const pcmData = Buffer.from(
       audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
       'base64'
@@ -109,10 +97,14 @@ export async function generateStory(
     };
   } catch (e: any) {
     console.error('An error occurred during story generation:', e);
-    // Provide a more user-friendly error message, but log the full technical error.
     let message = 'An unknown error occurred during generation.';
     if (e.message) {
-        message = `An AI model returned an error. Please try a different prompt or try again later. Details: ${e.message}`;
+      // Check for common, user-facing errors
+      if (e.message.includes('404 Not Found')) {
+         message = `An AI model could not be found. Please check the model names. Details: ${e.message}`;
+      } else {
+         message = `An AI model returned an error. Please try a different prompt or try again later. Details: ${e.message}`;
+      }
     }
     return {
       error: `Generation Failed: ${message}`,
