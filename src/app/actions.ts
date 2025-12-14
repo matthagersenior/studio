@@ -64,7 +64,7 @@ export async function generateStory(
       return { error: 'Failed to generate a valid story script.' };
     }
 
-    // Step 2: Generate audio.
+    // Step 2: Generate audio. This uses a different, dedicated model.
     const audioResult = await ai.generate({
       model: 'googleai/text-to-speech',
       prompt: script,
@@ -73,7 +73,7 @@ export async function generateStory(
       },
     });
     
-    // For stability, use a reliable placeholder image service.
+    // Step 3: For stability, use a reliable placeholder image service.
     const imageUrl = `https://picsum.photos/seed/${Date.now()}/540/960`;
 
     // Process audio result
