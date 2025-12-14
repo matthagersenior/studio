@@ -37,7 +37,8 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
     const handleAudioEnd = () => {
       if (audio) {
         audio.currentTime = 0;
-        audio.play();
+        setCurrentImageIndex(0); // Reset slideshow
+        audio.play(); // Loop
       }
     };
     audio?.addEventListener('ended', handleAudioEnd);
@@ -74,7 +75,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
         setIsPlaying(true);
     }).catch(e => {
         console.error("Media play failed:", e);
-        // Don't alert, just wait for user to click play.
+        // Play was likely interrupted or blocked by the browser.
         setIsPlaying(false);
     });
   };
@@ -101,6 +102,7 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
     if(audioRef.current) {
         audioRef.current.muted = newMutedState;
     }
+    // If unmuting and not already playing, start playback.
     if (!newMutedState && !isPlaying) {
         playMedia();
     }
@@ -108,23 +110,43 @@ export function StoryResult({ script, imageUrls, audioUrl, onReset }: StoryResul
 
   // Autoplay on mount when ready
   useEffect(() => {
-    if (audioUrl) {
-      const audio = audioRef.current;
-      const attemptPlay = () => {
-        if(audio && audio.readyState >= 3) {
-            playMedia();
-        }
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+  
+    // Function to attempt playing the media
+    const attemptPlay = () => {
+      if (audio.muted) { // Autoplay is more likely to succeed if muted
+        const playPromise = audio.play();
+        playPromise.then(() => {
+          setIsPlaying(true);
+        }).catch(error => {
+          console.error('Autoplay was prevented:', error);
+          setIsPlaying(false); // Ensure state is correct if autoplay fails
+        });
       }
+    };
+  
+    // Check if the audio is ready to play
+    if (audio.readyState >= 3) { // HAVE_FUTURE_DATA
       attemptPlay();
-      audio?.addEventListener('canplay', attemptPlay);
-      return () => audio?.removeEventListener('canplay', attemptPlay);
+    } else {
+      // If not ready, listen for the 'canplaythrough' event
+      const handleCanPlay = () => {
+        attemptPlay();
+        audio.removeEventListener('canplaythrough', handleCanPlay); // Clean up listener
+      };
+      audio.addEventListener('canplaythrough', handleCanPlay);
+  
+      return () => {
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+      };
     }
   }, [audioUrl]);
 
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
-      <audio ref={audioRef} muted={isMuted} />
+      <audio ref={audioRef} muted playsInline loop />
 
       <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
         
