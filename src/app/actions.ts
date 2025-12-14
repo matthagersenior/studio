@@ -43,7 +43,6 @@ export async function generateStory(
 
   try {
     // Step 1: Generate the story script and the image prompt in a single call.
-    // We will ask the model to return a JSON string and then parse it.
     const storyResponse = await ai.generate(
         {
           model: 'googleai/gemini-1.5-pro',
