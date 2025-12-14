@@ -34,9 +34,9 @@ export async function generateStory(
   }
 
   try {
-    // Step 1: Generate the story script using a more stable method.
+    // Step 1: Generate the story script using a stable model and simple JSON parsing.
     const storyResponse = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
+      model: 'googleai/gemini-pro',
       prompt: `You are a master storyteller. Based on the prompt below, create a short, dramatic, and engaging story script.
 
       Return ONLY a single, valid JSON object with one key: "script".
@@ -64,16 +64,14 @@ export async function generateStory(
       return { error: 'Failed to generate a valid story script.' };
     }
 
-    // Step 2: Generate audio and image in parallel.
-    const [audioResult] = await Promise.all([
-      ai.generate({
-        model: 'googleai/text-to-speech',
-        prompt: script,
-        config: {
-          responseModalities: ['AUDIO'],
-        },
-      }),
-    ]);
+    // Step 2: Generate audio.
+    const audioResult = await ai.generate({
+      model: 'googleai/text-to-speech',
+      prompt: script,
+      config: {
+        responseModalities: ['AUDIO'],
+      },
+    });
     
     // For stability, use a reliable placeholder image service.
     const imageUrl = `https://picsum.photos/seed/${Date.now()}/540/960`;
