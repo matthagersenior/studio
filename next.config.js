@@ -18,6 +18,15 @@ const nextConfig = {
       }
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+  // Increase the timeout to allow for video generation
+  serverActions: {
+    bodySizeLimit: '2mb',
+  },
 };
 
 module.exports = nextConfig;

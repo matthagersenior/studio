@@ -75,12 +75,11 @@ export default function Home() {
     form.reset();
   }
 
-  const isLoading = isUserLoading || loadingState === 'generating';
+  const isLoading = loadingState === 'generating';
 
   if (isLoading) {
     return (
       <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-black text-white">
-        {loadingState === 'generating' ? (
           <>
             <img 
                 src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBscjB3eGI4dmRmbnhxbm5tM3ZqN2s4bWhpYm12bXJseTNxZzV6eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7bu3XilJ5BOiSGic/giphy.gif"
@@ -91,9 +90,6 @@ export default function Home() {
             <p className="mt-4 text-lg font-mono text-center">Your brain is rotting...</p>
             <p className="mt-2 text-sm text-gray-400 font-mono text-center">Good things take time... this can take up to a minute.</p>
           </>
-        ) : (
-           <p>Loading...</p>
-        )}
       </main>
     );
   }
@@ -103,6 +99,7 @@ export default function Home() {
       <StoryResult
         script={generationResult.script}
         audioUrl={generationResult.audioUrl}
+        videoUrl={generationResult.videoUrl}
         onReset={resetApp}
       />
     );
