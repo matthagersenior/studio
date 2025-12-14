@@ -6,8 +6,8 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  videoUrl?: string;
-  audioUrl?: string;
+  imageUrls: string[];
+  audioUrl: string;
   error?: never;
 };
 
@@ -27,63 +27,36 @@ async function generateScript(prompt: string): Promise<string> {
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
 
-async function generateImage(script: string): Promise<string> {
+async function generateImages(script: string, count: number = 4): Promise<string[]> {
+  const imageUrls: string[] = [];
+  
+  // Generate a base prompt for all images
+  const basePrompt = `A surreal, cinematic, and meme-worthy image that visually represents the following script: ${script}.`;
+
+  // Generate images sequentially to avoid rate limiting
+  for (let i = 0; i < count; i++) {
+    // Add a slight variation for each image to get different results
+    const promptVariation = `${basePrompt} Style variation ${i + 1}.`;
+    
     const { media } = await ai.generate({
         model: 'googleai/imagen-4.0-fast-generate-001',
-        prompt: `A surreal, cinematic, and meme-worthy image that visually represents the following script: ${script}`,
+        prompt: promptVariation,
     });
+    
     if (!media?.url) {
-        throw new Error('Failed to generate image.');
+        // If one image fails, we can try to continue or just throw
+        console.warn(`Failed to generate image ${i + 1}.`);
+        continue; // Continue to the next image
     }
-    return media.url;
+    imageUrls.push(media.url);
+  }
+
+  if (imageUrls.length === 0) {
+    throw new Error('Failed to generate any images.');
+  }
+
+  return imageUrls;
 }
-
-
-async function generateVideoFromImage(imageUrl: string): Promise<string> {
-    let { operation } = await ai.generate({
-        model: 'googleai/veo-2.0-generate-001',
-        prompt: [
-            { text: 'Animate this image with subtle, eerie, and surreal motion. The movement should be slow and unsettling, fitting a chaotic and meme-worthy tone.' },
-            { media: { url: imageUrl, contentType: 'image/png' } }
-        ],
-        config: {
-            durationSeconds: 6,
-            aspectRatio: '9:16'
-        }
-    });
-
-    if (!operation) {
-        throw new Error('Video generation operation could not be started.');
-    }
-
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        operation = await ai.checkOperation(operation);
-    }
-
-    if (operation.error) {
-        console.error('Video generation failed:', operation.error);
-        throw new Error(`Video generation failed: ${operation.error.message}`);
-    }
-
-    const video = operation.output?.message?.content.find(p => !!p.media);
-    if (!video || !video.media?.url) {
-        throw new Error('Generated video content could not be found.');
-    }
-
-    const fetch = (await import('node-fetch')).default;
-    const videoDownloadResponse = await fetch(`${video.media.url}&key=${process.env.GEMINI_API_KEY}`);
-    
-    if (!videoDownloadResponse.ok) {
-        throw new Error(`Failed to download video file. Status: ${videoDownloadResponse.statusText}`);
-    }
-
-    const videoBuffer = await videoDownloadResponse.arrayBuffer();
-    const videoBase64 = Buffer.from(videoBuffer).toString('base64');
-    
-    return `data:video/mp4;base64,${videoBase64}`;
-}
-
 
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
@@ -120,16 +93,19 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    const [imageUrl, audioUrl] = await Promise.all([
-        generateImage(script),
+    // Run image and audio generation in parallel
+    const [imageUrls, audioUrl] = await Promise.all([
+        generateImages(script),
         generateVoiceover(script)
     ]);
     
-    const videoUrl = await generateVideoFromImage(imageUrl);
-    
+    if (imageUrls.length === 0) {
+        return { error: 'Image generation failed to produce any results.' };
+    }
+
     return { 
       script,
-      videoUrl,
+      imageUrls,
       audioUrl,
     };
 
