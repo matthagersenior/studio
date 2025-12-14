@@ -5,12 +5,12 @@
  *               a cinematic visual, and a voiceover.
  */
 
-import {genkit, ai} from '@/ai/genkit';
-import {toWav} from '@/lib/audio';
-import {z} from 'zod';
+import { ai } from '@/ai/genkit';
+import { toWav } from '@/lib/audio';
+import { z } from 'zod';
 
-// Define the schema for the structured story generation prompt.
-// This will generate the script and a prompt for the image generation.
+// Define the schema for the structured story generation.
+// We will ask the model to return a JSON string that we parse manually.
 const storyGenerationSchema = z.object({
   script: z
     .string()
@@ -38,42 +38,42 @@ export async function generateStory(
   prompt: string
 ): Promise<StoryResultPayload | StoryGenerationError> {
   if (!prompt || prompt.trim().length === 0) {
-    return {error: 'Prompt cannot be empty.'};
+    return { error: 'Prompt cannot be empty.' };
   }
 
   try {
-    // Step 1: Generate the story script and the image prompt in a single call.
-    const storyResponse = await ai.generate(
-        {
-          model: 'googleai/gemini-1.5-pro',
-          prompt: `You are a master storyteller. Create a short, dramatic, and engaging story based on the following prompt. The story should be between 150 and 200 words and have a clear narrative arc.
+    // Step 1: Generate the story script and the image prompt in a single, reliable call.
+    // We ask for a JSON object within a simple text prompt to avoid complex Genkit features that were failing.
+    const storyResponse = await ai.generate({
+      model: 'googleai/gemini-1.5-pro',
+      prompt: `You are a master storyteller. Based on the prompt below, create a short, dramatic, and engaging story script. Also, create a detailed, cinematic prompt for an AI image generator to create a visual for this story.
 
-Also, create a detailed prompt for an AI image generator to create a visual for this story.
+Return ONLY a single, valid JSON object with two keys: "script" and "imagePrompt".
 
-Return ONLY a valid JSON object with two keys: "script" and "imagePrompt".
+Do not wrap the JSON in markdown or any other characters.
 
-Prompt: ${prompt}`,
-        }
-      );
-      
-    // Manually parse the JSON from the text response.
+Prompt: "${prompt}"`,
+    });
+
+    const responseText = storyResponse.text;
     let parsedOutput;
+
     try {
-        // The model sometimes wraps the JSON in ```json ... ```, so we need to clean that up.
-        const cleanedText = storyResponse.text.replace(/^```json\n?/, '').replace(/```$/, '');
-        parsedOutput = storyGenerationSchema.parse(JSON.parse(cleanedText));
-    } catch (e) {
-        console.error("Failed to parse story generation response:", e);
-        return { error: "The AI failed to return a valid story structure. Please try again."};
+      // The model might still occasionally wrap the output in ```json ... ```, so we clean it.
+      const cleanedText = responseText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+      parsedOutput = storyGenerationSchema.parse(JSON.parse(cleanedText));
+    } catch (e: any) {
+      console.error("Failed to parse story generation response:", e, "Raw response:", responseText);
+      return { error: "The AI failed to return a valid story structure. Please try a different prompt." };
     }
-    
-    const {script, imagePrompt} = parsedOutput;
+
+    const { script, imagePrompt } = parsedOutput;
 
     if (!script || !imagePrompt) {
-      return {error: 'Failed to generate a story script or image prompt.'};
+      return { error: 'Failed to generate a valid story script or image prompt.' };
     }
 
-    // Step 2: Generate the visual and audio in parallel.
+    // Step 2: Generate the visual and audio in parallel for performance.
     const [imageResult, audioResult] = await Promise.all([
       // Generate the cinematic visual using the prompt from Step 1.
       ai.generate({
@@ -83,7 +83,7 @@ Prompt: ${prompt}`,
           aspectRatio: '9:16',
         },
       }),
-      // Generate the voiceover.
+      // Generate the voiceover from the script.
       ai.generate({
         model: 'googleai/text-to-speech',
         prompt: script,
@@ -96,17 +96,17 @@ Prompt: ${prompt}`,
     // Process image result
     const imageUrl = imageResult.media.url;
     if (!imageUrl) {
-      return {error: 'Failed to generate a visual.'};
+      return { error: 'Failed to generate the visual for the story.' };
     }
 
     // Process audio result
     const audioMedia = audioResult.media;
     if (!audioMedia?.url) {
-      return {error: 'Failed to generate a voiceover.'};
+      return { error: 'Failed to generate the voiceover for the story.' };
     }
 
-    // The audio is returned as PCM data in a base64 data URI.
-    // We need to convert it to a WAV file to be playable in the browser.
+    // The audio is returned as raw PCM data in a base64 data URI.
+    // We need to convert it to a WAV file so it can be played in the browser.
     const pcmData = Buffer.from(
       audioMedia.url.substring(audioMedia.url.indexOf(',') + 1),
       'base64'
@@ -120,22 +120,25 @@ Prompt: ${prompt}`,
       audioUrl,
     };
   } catch (e: any) {
-    console.error('Full error in generateStory:', e);
-    
-    // Provide a more user-friendly error message, but log the full error.
+    console.error('An error occurred during story generation:', e);
+
+    // Provide a more user-friendly error message, but log the full technical error.
     let message = 'An unknown error occurred during generation.';
     if (e.message) {
-        if (e.message.includes('v1beta')) {
-             message = `An AI model required by the application is not available. Please try again later. (Details: ${e.message})`;
-        } else if (e.message.includes('FETCH_ERROR') || e.message.includes('Not Found') || e.message.includes('Bad Request')) {
-            message = `An AI model returned an error. Please try a different prompt or try again later. Details: ${e.message}`;
-        } else {
-            message = e.message;
-        }
+      // Catch specific, common errors and provide better messages.
+      if (e.message.includes('v1beta')) {
+        message = `An AI model required by the application is not available. This is a configuration issue. (Details: ${e.message})`;
+      } else if (e.message.includes('404') || e.message.includes('Not Found')) {
+        message = `An AI model could not be found. Please check the model names. Details: ${e.message}`;
+      } else if (e.message.includes('400') || e.message.includes('Bad Request')) {
+        message = `The request to the AI model was invalid. This may be a syntax error in the prompt. Details: ${e.message}`;
+      } else {
+        message = e.message;
+      }
     }
-    
+
     return {
-      error: message,
+      error: `Generation Failed: ${message}`,
     };
   }
 }

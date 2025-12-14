@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -60,6 +61,7 @@ export default function Home() {
         variant: "destructive",
         title: "Generation Failed",
         description: result.error,
+        duration: 9000,
       });
       setLoadingState('idle');
     } else {
