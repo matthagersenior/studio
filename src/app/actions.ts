@@ -25,7 +25,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   }
 
   try {
-    const scriptGen = ai.generate({
+    const scriptPromise = ai.generate({
         model: googleAI.model('gemini-2.5-flash'),
         prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script. The script should be a very short, absurd, single-paragraph story. The language should be deliberately exaggerated and contain elements of internet culture. The total output should be 3-5 sentences long. Use a dramatic, high-energy tone. Do not include scene descriptions or actions in brackets or parentheses. User Prompt: ${prompt}`,
         output: {
@@ -33,7 +33,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
         },
     });
 
-    const [scriptResponse] = await Promise.all([scriptGen]);
+    const [scriptResponse] = await Promise.all([scriptPromise]);
     
     let script = scriptResponse.output;
 
