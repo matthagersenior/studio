@@ -6,7 +6,7 @@ import { toWav } from "@/lib/wav-converter";
 
 export type StoryResultPayload = {
   script: string;
-  imageUrl?: string;
+  videoUrl?: string;
   audioUrl?: string;
   error?: never;
 };
@@ -26,6 +26,64 @@ async function generateScript(prompt: string): Promise<string> {
   }
   return script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
 }
+
+async function generateImage(script: string): Promise<string> {
+    const { media } = await ai.generate({
+        model: 'googleai/imagen-4.0-fast-generate-001',
+        prompt: `A surreal, cinematic, and meme-worthy image that visually represents the following script: ${script}`,
+    });
+    if (!media?.url) {
+        throw new Error('Failed to generate image.');
+    }
+    return media.url;
+}
+
+
+async function generateVideoFromImage(imageUrl: string): Promise<string> {
+    let { operation } = await ai.generate({
+        model: 'googleai/veo-2.0-generate-001',
+        prompt: [
+            { text: 'Animate this image with subtle, eerie, and surreal motion. The movement should be slow and unsettling, fitting a chaotic and meme-worthy tone.' },
+            { media: { url: imageUrl, contentType: 'image/png' } }
+        ],
+        config: {
+            durationSeconds: 6,
+            aspectRatio: '9:16'
+        }
+    });
+
+    if (!operation) {
+        throw new Error('Video generation operation could not be started.');
+    }
+
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        operation = await ai.checkOperation(operation);
+    }
+
+    if (operation.error) {
+        console.error('Video generation failed:', operation.error);
+        throw new Error(`Video generation failed: ${operation.error.message}`);
+    }
+
+    const video = operation.output?.message?.content.find(p => !!p.media);
+    if (!video || !video.media?.url) {
+        throw new Error('Generated video content could not be found.');
+    }
+
+    const fetch = (await import('node-fetch')).default;
+    const videoDownloadResponse = await fetch(`${video.media.url}&key=${process.env.GEMINI_API_KEY}`);
+    
+    if (!videoDownloadResponse.ok) {
+        throw new Error(`Failed to download video file. Status: ${videoDownloadResponse.statusText}`);
+    }
+
+    const videoBuffer = await videoDownloadResponse.arrayBuffer();
+    const videoBase64 = Buffer.from(videoBuffer).toString('base64');
+    
+    return `data:video/mp4;base64,${videoBase64}`;
+}
+
 
 async function generateVoiceover(script: string): Promise<string> {
     const { media } = await ai.generate({
@@ -62,15 +120,16 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
   try {
     const script = await generateScript(prompt);
     
-    // Generate a placeholder image URL
-    const imageUrl = `https://picsum.photos/seed/${Math.random()}/540/960`;
+    const [imageUrl, audioUrl] = await Promise.all([
+        generateImage(script),
+        generateVoiceover(script)
+    ]);
     
-    // Run voiceover generation
-    const audioUrl = await generateVoiceover(script);
+    const videoUrl = await generateVideoFromImage(imageUrl);
     
     return { 
       script,
-      imageUrl,
+      videoUrl,
       audioUrl,
     };
 

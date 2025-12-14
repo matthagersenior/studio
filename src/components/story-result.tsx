@@ -5,7 +5,6 @@ import { Button } from "./ui/button";
 import { useEffect, useRef, useState } from "react";
 import { KaraokeScript } from "./karaoke-script";
 import { Volume2, VolumeX, Play, Pause } from "lucide-react";
-import Image from "next/image";
 import {
   Tooltip,
   TooltipContent,
@@ -15,13 +14,14 @@ import {
 
 interface StoryResultProps {
   script: string;
-  imageUrl: string;
+  videoUrl: string;
   audioUrl: string;
   onReset: () => void;
 }
 
-export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResultProps) {
+export function StoryResult({ script, videoUrl, audioUrl, onReset }: StoryResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mediaDuration, setMediaDuration] = useState(0);
@@ -29,13 +29,18 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
   // Autoplay logic
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    const video = videoRef.current;
+    if (!audio || !video || !audioUrl || !videoUrl) return;
 
     audio.src = audioUrl;
-
+    video.src = videoUrl;
+    
     const attemptPlay = async () => {
       try {
-        await audio.play();
+        await Promise.all([
+          video.play(),
+          audio.play()
+        ]);
         setIsPlaying(true);
       } catch (error) {
         console.error('Autoplay was prevented:', error);
@@ -45,6 +50,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     };
     
     audio.muted = isMuted;
+    video.muted = true; // Video is always muted, audio comes from audio track
 
     const handleCanPlay = () => {
       if (audio.duration > 0 && isFinite(audio.duration)) {
@@ -56,9 +62,13 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
     const handleEnded = () => {
         setIsPlaying(false);
         // Loop
-        if (audioRef.current) {
+        if (audioRef.current && videoRef.current) {
           audioRef.current.currentTime = 0;
-          audioRef.current.play().then(() => setIsPlaying(true));
+          videoRef.current.currentTime = 0;
+          Promise.all([
+            audioRef.current.play(),
+            videoRef.current.play()
+          ]).then(() => setIsPlaying(true));
         }
     };
 
@@ -69,7 +79,7 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       audio.removeEventListener('canplaythrough', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioUrl]); 
+  }, [videoUrl, audioUrl]); 
 
   useEffect(() => {
     if (audioRef.current) {
@@ -79,13 +89,17 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
 
 
   const playMedia = () => {
-    if (!audioRef.current) return;
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(e => console.error("Media play failed:", e));
+    if (!audioRef.current || !videoRef.current) return;
+    Promise.all([
+      videoRef.current.play(),
+      audioRef.current.play()
+    ]).then(() => setIsPlaying(true)).catch(e => console.error("Media play failed:", e));
   };
 
   const pauseMedia = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || !videoRef.current) return;
     audioRef.current.pause();
+    videoRef.current.pause();
     setIsPlaying(false);
   };
 
@@ -111,12 +125,14 @@ export function StoryResult({ script, imageUrl, audioUrl, onReset }: StoryResult
       <div className="w-screen h-screen bg-black flex items-center justify-center p-0">
         <div className="w-full h-full md:w-auto md:h-full aspect-[9/16] max-w-full max-h-screen relative overflow-hidden bg-black md:rounded-xl md:shadow-2xl md:shadow-primary/20">
           
-          {imageUrl && (
-            <Image 
-                src={imageUrl}
-                alt="Generated visual"
-                fill
-                className="object-cover animate-kenburns"
+          {videoUrl && (
+            <video 
+                ref={videoRef}
+                src={videoUrl}
+                playsInline
+                loop
+                muted
+                className="object-cover w-full h-full"
             />
           )}
           <audio ref={audioRef} playsInline />
