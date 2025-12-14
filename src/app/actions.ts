@@ -17,12 +17,9 @@ export type StoryGenerationError = {
   error: string;
 };
 
-const ScriptSchema = z.string().describe("A short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions.");
-const ImagePromptSchema = z.string().describe("A DALL-E prompt that would generate a cinematic, surreal, and slightly cursed image to accompany the script.");
-
 const StoryOutputSchema = z.object({
-    script: ScriptSchema,
-    imagePrompt: ImagePromptSchema,
+    script: z.string().describe("A short, absurd, single-paragraph script. 3-5 sentences long. No scene descriptions."),
+    imagePrompt: z.string().describe("A prompt for an image generator like DALL-E or Imagen that would generate a cinematic, surreal, and slightly cursed image to accompany the script."),
 });
 
 
@@ -35,7 +32,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     // STAGE 1: Generate script and image prompt in a single, efficient call.
     const initialResponse = await ai.generate({
         model: googleAI.model('gemini-1.5-flash'),
-        prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script for a short video and a prompt for an image generator like DALL-E.
+        prompt: `You are an AI specializing in surreal, chaotic, and meme-worthy content. Based on the user's prompt, generate a script for a short video and a prompt for an image generator like Imagen.
 
         User Prompt: ${prompt}
         
@@ -48,11 +45,13 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     });
 
     let { script, imagePrompt } = initialResponse.output || {};
+
     if (!script || !imagePrompt) {
-        throw new Error('Failed to generate script and image prompt.');
+        throw new Error('Failed to generate script and image prompt from the initial AI call.');
     }
+    
     // Clean up any stray markdown or parentheticals the model might add.
-    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/---/g, '\n\n').trim();
+    script = script.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim();
 
     // STAGE 2: Generate audio and image in PARALLEL for maximum efficiency.
     const [audioResult, imageResult] = await Promise.all([
@@ -79,7 +78,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     // Process Audio
     const audioMedia = audioResult.media;
     if (!audioMedia?.url) {
-      throw new Error('Failed to generate voiceover.');
+      throw new Error('The voiceover generation step failed to produce audio.');
     }
     const audioBuffer = Buffer.from(audioMedia.url.substring(audioMedia.url.indexOf(',') + 1), 'base64');
     const wavBase64 = await toWav(audioBuffer);
@@ -88,7 +87,7 @@ export async function generateStory(prompt: string): Promise<StoryResultPayload 
     // Process Image
     const imageMedia = imageResult.media;
     if (!imageMedia?.url) {
-      throw new Error('Failed to generate image.');
+      throw new Error('The image generation step failed to produce a visual.');
     }
 
     // STAGE 3: Return the complete, successful payload.
